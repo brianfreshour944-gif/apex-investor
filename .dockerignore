@@ -1,0 +1,28 @@
+# Build context hygiene: private/runtime files must never enter the image build context.
+.git
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Operator / runtime data — never baked into an image
+data/portfolio.json
+data/equity_history*.json
+data/known_actions.json
+data/cache/
+reports/
+.env
+.env.*
+*.db
+*.sqlite3
+*.log
+
+# Not needed at runtime
+tests/
+Dockerfile
+.dockerignore
