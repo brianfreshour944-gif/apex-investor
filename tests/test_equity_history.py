@@ -15,7 +15,6 @@ sys.path.insert(0, str(SCRIPTS))
 
 import daily_report  # noqa: E402
 
-
 # --- load_equity_history -----------------------------------------------------
 
 def test_load_missing_file_returns_empty(tmp_path):
