@@ -25,3 +25,6 @@ data/known_actions.json
 
 # Agent working notes / local memory are not source
 .openhands/
+
+# Generated daily reports are runtime output, never source (they contain portfolio values)
+reports/daily/
