@@ -33,6 +33,45 @@ LIVE_PORTFOLIO = ROOT / "data" / "portfolio.json"
 # A ratio that does not match the observed factor does NOT explain the move (it stays flagged).
 # Format: [{"ticker": "X", "date": "2026-11-05", "ratio": 8.0, "label": "1:8 reverse split"}]
 KNOWN_ACTIONS_FILE = ROOT / "data" / "known_actions.json"
+# Persisted daily equity so the report's "Daily change" is a real day-over-day number instead of
+# a permanent n/a. Example runs use a SEPARATE history so demo data can never mix with live data.
+EQUITY_HISTORY_LIVE = ROOT / "data" / "equity_history.json"
+EQUITY_HISTORY_EXAMPLE = ROOT / "data" / "equity_history.example.json"
+
+
+def load_equity_history(path: Path) -> list[dict]:
+    """Read the equity history file. Absent or malformed -> [] (fail closed, first-run behaviour)."""
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text())
+    except (ValueError, OSError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def previous_equity_from_history(history: list, report_date: str) -> float | None:
+    """Most recent recorded equity STRICTLY BEFORE `report_date`, else None."""
+    best: tuple[str, float] | None = None
+    for entry in history:
+        if not isinstance(entry, dict):
+            continue
+        d, eq = entry.get("date"), entry.get("equity")
+        if not isinstance(d, str) or not isinstance(eq, (int, float)) or d >= report_date:
+            continue
+        if best is None or d > best[0]:
+            best = (d, float(eq))
+    return best[1] if best else None
+
+
+def append_equity_history(path: Path, report_date: str, equity: float) -> None:
+    """Record today's equity, replacing any same-date entry (re-runs refine, never duplicate)."""
+    history = [e for e in load_equity_history(path)
+               if isinstance(e, dict) and e.get("date") != report_date]
+    history.append({"date": report_date, "equity": round(float(equity), 2)})
+    history.sort(key=lambda e: e.get("date", ""))
+    path.write_text(json.dumps(history, indent=2))
+
 
 
 def load_known_actions(path: Path) -> tuple[list[dict], list[str]]:
@@ -92,7 +131,10 @@ def gather_prices(tickers, *, offline: bool) -> tuple[dict, dict, list[str], dic
     """Latest quote per ticker. Returns (prices, price_dates, missing, prev_bars). Fail closed.
 
     One refresh-aware fetch per ticker: a stale cache is refreshed (unless `offline`), so a stale
-    cache does not block a report a fresh fetch could satisfy. A bar still older than
+    cache does not block a report a fresh fetch could satisfy. Live runs ALWAYS attempt a network
+    refresh (max_cache_age_days=0), so prices track the market daily instead of riding a
+    <=5-day-old cache; on fetch failure the cache layer falls back to cached bars and the
+    MAX_PRICE_AGE_DAYS gate decides whether they are still usable. A bar still older than
     MAX_PRICE_AGE_DAYS after that is treated as MISSING, so it cannot pass as a live quote.
     `price_dates` carries each ticker's own date; `prev_bars` the previous valid bar (sanity guard).
     """
@@ -102,8 +144,10 @@ def gather_prices(tickers, *, offline: bool) -> tuple[dict, dict, list[str], dic
     missing: list[str] = []
     for tk in tickers:
         try:
+            # 0 = only a same-day cache is reused without a network call; otherwise refetch.
+            # On fetch failure fetch_bars returns the cached bars and the age gate still applies.
             bars = fetch_bars(tk, use_cache=True,
-                              max_cache_age_days=None if offline else MAX_PRICE_AGE_DAYS)
+                              max_cache_age_days=None if offline else 0)
         except Exception:  # noqa: BLE001 - a fetch failure means "no fresh quote", not a crash
             missing.append(tk)
             continue
@@ -148,6 +192,8 @@ def main() -> int:
               file=sys.stderr)
         return 2
     led, tags = load_portfolio(portfolio)
+    history_path = EQUITY_HISTORY_EXAMPLE if args.example else EQUITY_HISTORY_LIVE
+    previous_equity = previous_equity_from_history(load_equity_history(history_path), args.date)
     prices, dates, missing, prev_bars = gather_prices(sorted(led.positions),
                                                       offline=args.offline)
     as_of = max(dates.values()) if dates else None
@@ -163,12 +209,21 @@ def main() -> int:
     report = build_report(args.date, led, prices, tags=tags, price_as_of=as_of,
                           price_dates=dates, quote_checks=checks,
                           missing_tickers=missing, config_problems=config_problems,
+                          previous_equity=previous_equity,
                           price_source="Yahoo Finance (cached)")
 
     print(report.to_console())
     print("\n" + "=" * 70)
     path = write_report(report, regenerate=True)
     print(f"written: {path}")
+    if report.preserved_original:
+        print(f"regenerated: preserved original as {report.preserved_original}")
+    if report.equity is not None:
+        try:
+            append_equity_history(history_path, args.date, report.equity)
+        except OSError as e:
+            print(f"WARNING: could not update equity history {history_path.name}: {e}",
+                  file=sys.stderr)
     if missing:
         print(f"WARNING: no fresh quote for {missing} — report is BLOCKED, not OK")
     blocked = [c.ticker for c in checks if c.blocks]
