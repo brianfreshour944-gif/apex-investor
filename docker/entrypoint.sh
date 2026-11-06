@@ -15,6 +15,14 @@ PORTFOLIO_MODE="${PORTFOLIO_MODE:-example}"
 
 cd /app
 
+# F6: fail visibly on invalid configuration instead of looping forever.
+# A malformed REPORT_TIME_UTC must STOP the container with a clear error, so Coolify shows the
+# failure rather than leaving a broken scheduler running.
+if ! printf '%s' "$REPORT_TIME_UTC" | grep -Eq '^([01][0-9]|2[0-3]):[0-5][0-9]$'; then
+  echo "FATAL: invalid REPORT_TIME_UTC='$REPORT_TIME_UTC' (expected HH:MM, 00:00-23:59 UTC)" >&2
+  exit 1
+fi
+
 run_report() {
   echo "=== apex-investor report run @ $(date -u +%FT%TZ) ==="
   if [ "$PORTFOLIO_MODE" = "live" ]; then
