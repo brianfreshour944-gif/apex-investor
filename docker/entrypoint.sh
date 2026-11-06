@@ -23,17 +23,34 @@ if ! printf '%s' "$REPORT_TIME_UTC" | grep -Eq '^([01][0-9]|2[0-3]):[0-5][0-9]$'
   exit 1
 fi
 
+# F5: same-day idempotency. The scheduler runs once at startup AND once per scheduled time, so a
+# restart on the same day would otherwise duplicate the report (extra backups, noisy audit trail).
+# The state file lives on the persistent volume (/app/data), so the guard survives redeploys.
+STATE_FILE="/app/data/.last_report_run"
+
 run_report() {
+  local today rc
+  today=$(date -u +%F)
+  if [ -f "$STATE_FILE" ] && [ "$(cat "$STATE_FILE" 2>/dev/null)" = "$today" ]; then
+    echo "already reported for $today (state file) — skipping duplicate run"
+    return 0
+  fi
   echo "=== apex-investor report run @ $(date -u +%FT%TZ) ==="
   if [ "$PORTFOLIO_MODE" = "live" ]; then
     if [ -f data/portfolio.json ]; then
-      python scripts/daily_report.py || echo "WARNING: report run exited non-zero"
+      python scripts/daily_report.py
+      rc=$?
+      [ "$rc" -eq 0 ] && printf '%s\\n' "$today" > "$STATE_FILE"
+      [ "$rc" -ne 0 ] && echo "WARNING: report run exited non-zero ($rc) — day not marked done"
     else
       echo "PORTFOLIO_MODE=live but data/portfolio.json is missing — FAILING CLOSED, no report."
     fi
   else
     echo "NOTE: PORTFOLIO_MODE=example — demo portfolio only, never the live ledger."
-    python scripts/daily_report.py --example || echo "WARNING: report run exited non-zero"
+    python scripts/daily_report.py --example
+    rc=$?
+    [ "$rc" -eq 0 ] && printf '%s\\n' "$today" > "$STATE_FILE"
+    [ "$rc" -ne 0 ] && echo "WARNING: report run exited non-zero ($rc) — day not marked done"
   fi
 }
 
