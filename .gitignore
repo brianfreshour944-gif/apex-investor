@@ -10,6 +10,9 @@ venv/
 .pytest_cache/
 .ruff_cache/
 data/cache/
+# Daily equity snapshots are runtime state written by the report job, never source.
+# Example-mode history must also stay out of git (data/equity_history.example.json).
+data/equity_history*.json
 *.egg-info/
 dist/
 build/
