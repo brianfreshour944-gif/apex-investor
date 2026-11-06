@@ -142,6 +142,81 @@ def test_fetch_bars_keeps_stale_cache_when_refresh_fails(monkeypatch, tmp_path):
     assert bars[-1].close == 5000.0        # falls back to cache; caller's staleness check decides
 
 
+def test_fetch_bars_sourced_reports_cache_for_fresh_cache(monkeypatch, tmp_path):
+    """F4 provenance: a fresh cache hit must be labelled 'cache', not 'network'."""
+    import urllib.request
+    from datetime import UTC, datetime
+
+    from apex_investor.prices import fetch_bars_sourced
+    today = datetime.now(UTC).date().isoformat()
+    _write_cache(tmp_path, "X", [Bar(today, 10.0, 10.0, 1)])
+
+    def boom(*a, **k):
+        raise AssertionError("network must not be used for a fresh cache")
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+
+    bars, source = fetch_bars_sourced("X", cache_dir=tmp_path, max_cache_age_days=7)
+    assert source == "cache"
+    assert bars[-1].close == 10.0
+
+
+def test_fetch_bars_sourced_reports_network_on_refresh(monkeypatch, tmp_path):
+    """F4 provenance: a successful stale-cache refresh must be labelled 'network'."""
+    import json
+    import urllib.request
+
+    from apex_investor.prices import fetch_bars_sourced
+    _write_cache(tmp_path, "X", [Bar("2024-12-30", 5000.0, 5000.0, 1)])   # stale
+
+    fresh = Bar("2026-11-05", 2.29, 2.29, 1)
+    payload = json.dumps({"chart": {"result": [{
+        "timestamp": [_epoch(fresh.date)], "indicators": {
+            "quote": [{"close": [fresh.close], "volume": [1]}],
+            "adjclose": [{"adjclose": [fresh.adj_close]}]}}]}}).encode()
+
+    class _Resp:
+        def read(self):
+            return payload
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _Resp())
+
+    bars, source = fetch_bars_sourced("X", cache_dir=tmp_path, max_cache_age_days=7)
+    assert source == "network"
+    assert bars[-1].date == fresh.date
+
+
+def test_fetch_bars_sourced_reports_cache_fallback_when_refresh_fails(monkeypatch, tmp_path):
+    """F4 provenance: a failed refresh that hands back cached bars must be labelled as such."""
+    import urllib.request
+
+    from apex_investor.prices import fetch_bars_sourced
+    _write_cache(tmp_path, "X", [Bar("2024-12-30", 5000.0, 5000.0, 1)])
+
+    def boom(*a, **k):
+        raise OSError("offline")
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    monkeypatch.setattr("apex_investor.prices.time.sleep", lambda *_: None)
+
+    bars, source = fetch_bars_sourced("X", cache_dir=tmp_path, max_cache_age_days=7)
+    assert source == "cache-fallback"
+    assert bars[-1].close == 5000.0
+
+
+def test_price_source_label_counts_provenance():
+    """F4: the report label must summarise ACTUAL retrieval provenance, never hardcode 'cached'."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    from daily_report import _price_source_label
+
+    assert _price_source_label({}) == "no quotes retrieved"
+    assert _price_source_label({"AAPL": "network", "KO": "network"}) == \
+        "Yahoo Finance (2 network)"
+    assert _price_source_label({"AAPL": "network", "KO": "cache"}) == \
+        "Yahoo Finance (1 cache, 1 network)"
+    assert _price_source_label({"KO": "cache-fallback"}) == \
+        "Yahoo Finance (1 cache-fallback)"
+
+
 def test_fetch_bars_does_not_refresh_without_policy(monkeypatch, tmp_path):
     """Replay semantics: no refresh policy -> stale cache is returned as-is (no network)."""
     import urllib.request

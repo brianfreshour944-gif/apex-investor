@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from apex_investor.ledger import Ledger, Side, Tag, Transaction  # noqa: E402
-from apex_investor.prices import Bar, fetch_bars  # noqa: E402
+from apex_investor.prices import Bar, fetch_bars_sourced  # noqa: E402
 from apex_investor.report import MAX_PRICE_AGE_DAYS, build_report, write_report  # noqa: E402
 from apex_investor.sanity import PriceSanityLimits, check_quote  # noqa: E402
 
@@ -127,8 +127,10 @@ def _fresh_latest(bars: list[Bar]) -> Bar | None:
     return bar if 0 <= age <= MAX_PRICE_AGE_DAYS else None
 
 
-def gather_prices(tickers, *, offline: bool) -> tuple[dict, dict, list[str], dict]:
-    """Latest quote per ticker. Returns (prices, price_dates, missing, prev_bars). Fail closed.
+def gather_prices(tickers, *, offline: bool) -> tuple[dict, dict, list[str], dict, dict]:
+    """Latest quote per ticker. Returns (prices, price_dates, missing, prev_bars, price_sources).
+
+    Fail closed.
 
     One refresh-aware fetch per ticker: a stale cache is refreshed (unless `offline`), so a stale
     cache does not block a report a fresh fetch could satisfy. Live runs ALWAYS attempt a network
@@ -142,12 +144,15 @@ def gather_prices(tickers, *, offline: bool) -> tuple[dict, dict, list[str], dic
     dates: dict[str, str] = {}
     prev_bars: dict = {}
     missing: list[str] = []
+    price_sources: dict[str, str] = {}
     for tk in tickers:
         try:
             # 0 = only a same-day cache is reused without a network call; otherwise refetch.
-            # On fetch failure fetch_bars returns the cached bars and the age gate still applies.
-            bars = fetch_bars(tk, use_cache=True,
-                              max_cache_age_days=None if offline else 0)
+            # On fetch failure fetch_bars_sourced returns the cached bars with 'cache-fallback'
+            # provenance and the age gate still applies.
+            bars, source = fetch_bars_sourced(tk, use_cache=True,
+                                              max_cache_age_days=None if offline else 0)
+            price_sources[tk] = source
         except Exception:  # noqa: BLE001 - a fetch failure means "no fresh quote", not a crash
             missing.append(tk)
             continue
@@ -160,7 +165,22 @@ def gather_prices(tickers, *, offline: bool) -> tuple[dict, dict, list[str], dic
         prev = [b for b in bars if b.date < bar.date]
         if prev:
             prev_bars[tk] = prev[-1]
-    return prices, dates, missing, prev_bars
+    return prices, dates, missing, prev_bars, price_sources
+
+
+def _price_source_label(price_sources: dict[str, str]) -> str:
+    """Honest retrieval summary for the report header: counts by ACTUAL provenance (F4).
+
+    Replaces the hardcoded 'Yahoo Finance (cached)' label, which could not distinguish a network
+    refresh from a cache hit.
+    """
+    if not price_sources:
+        return "no quotes retrieved"
+    counts: dict[str, int] = {}
+    for src in price_sources.values():
+        counts[src] = counts.get(src, 0) + 1
+    parts = [f"{n} {src}" for src, n in sorted(counts.items())]
+    return "Yahoo Finance (" + ", ".join(parts) + ")"
 
 
 def sanity_checks(tickers, latest_by_ticker, prev_bars, *, limits, known_actions):
@@ -194,8 +214,8 @@ def main() -> int:
     led, tags = load_portfolio(portfolio)
     history_path = EQUITY_HISTORY_EXAMPLE if args.example else EQUITY_HISTORY_LIVE
     previous_equity = previous_equity_from_history(load_equity_history(history_path), args.date)
-    prices, dates, missing, prev_bars = gather_prices(sorted(led.positions),
-                                                      offline=args.offline)
+    prices, dates, missing, prev_bars, price_sources = gather_prices(sorted(led.positions),
+                                                                     offline=args.offline)
     as_of = max(dates.values()) if dates else None
 
     known_actions, config_problems = load_known_actions(KNOWN_ACTIONS_FILE)
@@ -210,7 +230,8 @@ def main() -> int:
                           price_dates=dates, quote_checks=checks,
                           missing_tickers=missing, config_problems=config_problems,
                           previous_equity=previous_equity,
-                          price_source="Yahoo Finance (cached)")
+                          price_source=_price_source_label(price_sources),
+                          price_sources=price_sources)
 
     print(report.to_console())
     print("\n" + "=" * 70)

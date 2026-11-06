@@ -155,7 +155,27 @@ def parse_chart(payload: dict) -> list[Bar]:
 def fetch_bars(symbol: str, start: str = "2015-01-01", end: str | None = None,
                cache_dir: Path | str = DEFAULT_CACHE, use_cache: bool = True,
                max_cache_age_days: int | None = None) -> list[Bar]:
-    """Fetch daily bars, caching to `cache_dir/<symbol>.json`.
+    """Fetch daily bars, caching to `cache_dir/<symbol>.json` (see `_fetch_bars_impl`)."""
+    return _fetch_bars_impl(symbol, start=start, end=end, cache_dir=cache_dir,
+                            use_cache=use_cache, max_cache_age_days=max_cache_age_days)[0]
+
+
+def fetch_bars_sourced(symbol: str, start: str = "2015-01-01", end: str | None = None,
+                       cache_dir: Path | str = DEFAULT_CACHE, use_cache: bool = True,
+                       max_cache_age_days: int | None = None) -> tuple[list[Bar], str]:
+    """`fetch_bars` plus provenance: 'network' | 'cache' | 'cache-fallback'.
+
+    The report must state where each quote ACTUALLY came from rather than guessing from
+    configuration, so the live path records retrieval provenance per ticker (review F4).
+    """
+    return _fetch_bars_impl(symbol, start=start, end=end, cache_dir=cache_dir,
+                            use_cache=use_cache, max_cache_age_days=max_cache_age_days)
+
+
+def _fetch_bars_impl(symbol: str, start: str = "2015-01-01", end: str | None = None,
+                     cache_dir: Path | str = DEFAULT_CACHE, use_cache: bool = True,
+                     max_cache_age_days: int | None = None) -> tuple[list[Bar], str]:
+    """Fetch daily bars, caching to `cache_dir/<symbol>.json`. Returns (bars, provenance).
 
     `use_cache` reads an existing cache file. `max_cache_age_days`, when set, treats a cache whose
     newest bar is older than that as a MISS and refetches from the network (the live path uses this
@@ -182,10 +202,10 @@ def fetch_bars(symbol: str, start: str = "2015-01-01", end: str | None = None,
             age = (ref - newest).days if newest is not None else None
             # fresh only if within the limit AND not future-dated (a future bar is not trustworthy)
             if age is not None and 0 <= age <= max_cache_age_days:
-                return cached
+                return cached, "cache"
             # stale or future-dated -> fall through and try a fresh fetch
         elif cached:
-            return cached
+            return cached, "cache"
 
     end = end or datetime.now(UTC).date().isoformat()
     p1 = int(datetime.fromisoformat(start).replace(tzinfo=UTC).timestamp())
@@ -204,7 +224,7 @@ def fetch_bars(symbol: str, start: str = "2015-01-01", end: str | None = None,
                 raise MalformedPayloadError(f"response is not JSON: {e!r}") from e
             bars = parse_chart(payload)
             f.write_text(json.dumps({"symbol": symbol, "bars": [b.to_dict() for b in bars]}))
-            return bars
+            return bars, "network"
         except RETRYABLE_FETCH_ERRORS as e:
             # expected availability problem (network / non-JSON / malformed payload): retry
             last_err = e
@@ -212,7 +232,7 @@ def fetch_bars(symbol: str, start: str = "2015-01-01", end: str | None = None,
         # anything else (e.g. TypeError/AttributeError from a defect) propagates immediately and is
         # never retried, never re-wrapped as a data-availability failure
     if cached is not None:            # refresh failed; hand back what we have (staleness decides)
-        return cached
+        return cached, "cache-fallback"
     raise PriceFetchError(f"fetch failed for {symbol}: {last_err!r}") from last_err
 
 

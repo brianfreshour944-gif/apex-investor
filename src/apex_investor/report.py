@@ -65,6 +65,7 @@ class DailyReport:
     volume_baseline_days: int
     risk_limits: RiskLimits = field(default_factory=RiskLimits)
     quote_checks: list = field(default_factory=list)
+    price_sources: dict = field(default_factory=dict)  # ticker -> network|cache|cache-fallback
     regenerated_at: str | None = None
     preserved_original: str | None = None
     extra_evidence: dict = field(default_factory=dict)
@@ -185,6 +186,9 @@ class DailyReport:
                  f"- Price source: {self.price_source}",
                  f"- Price as of: {self.price_as_of or 'n/a'}",
                  f"- Volume baseline: {self.volume_baseline_days}-day average"]
+        if self.price_sources:
+            lines.append("- Price retrieval: " + ", ".join(
+                f"{tk}={src}" for tk, src in sorted(self.price_sources.items())))
         for k, v in self.extra_evidence.items():
             lines.append(f"- {k}: {v}")
         for problem in self.config_problems:
@@ -257,7 +261,8 @@ def build_report(date: str, ledger: Ledger, prices: dict[str, float], *,
                  price_dates: dict[str, str] | None = None,
                  quote_checks: list[QuoteCheck] | None = None,
                  missing_tickers: list[str] | None = None,
-                 config_problems: list[str] | None = None) -> DailyReport:
+                 config_problems: list[str] | None = None,
+                 price_sources: dict[str, str] | None = None) -> DailyReport:
     """Assemble a DailyReport from the ledger, prices and alerts. Deterministic.
 
     FAIL CLOSED on stale, missing or unvalidatable price data:
@@ -386,6 +391,7 @@ def build_report(date: str, ledger: Ledger, prices: dict[str, float], *,
         price_source=price_source, price_as_of=price_as_of,
         volume_baseline_days=volume_baseline_days, risk_limits=limits,
         quote_checks=checks, config_problems=config_list,
+        price_sources=dict(price_sources or {}),
     )
 
 

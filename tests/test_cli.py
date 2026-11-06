@@ -53,8 +53,8 @@ def workspace(tmp_path, monkeypatch):
 
     monkeypatch.setattr(daily_report, "KNOWN_ACTIONS_FILE", tmp_path / "known_actions.json")
     monkeypatch.setattr(daily_report, "LIVE_PORTFOLIO", portfolio)
-    monkeypatch.setattr(daily_report, "fetch_bars",
-                        lambda tk, **k: _load_cache(cache, tk))
+    monkeypatch.setattr(daily_report, "fetch_bars_sourced",
+                        lambda tk, **k: (_load_cache(cache, tk), "cache"))
     monkeypatch.setattr(daily_report, "write_report", lambda report, **k: tmp_path / "out.md")
     return {"tmp": tmp_path, "portfolio": portfolio, "cache": cache, "today": today}
 
@@ -93,9 +93,10 @@ def test_cli_missing_quote_blocks_status(workspace, capsys):
 def test_cli_missing_quote_blocks_via_api(workspace):
     """Same wiring, checked on the report object rather than console text."""
     led, tags = daily_report.load_portfolio(workspace["portfolio"])
-    prices, dates, missing, prev = daily_report.gather_prices(sorted(led.positions),
-                                                              offline=True)
+    prices, dates, missing, prev, sources = daily_report.gather_prices(sorted(led.positions),
+                                                                       offline=True)
     assert missing == ["MISSING"]
+    assert sources == {"GOOD": "cache"}
     as_of = max(dates.values()) if dates else None
     from apex_investor.prices import Bar
     latest = {tk: Bar(dates[tk], prices[tk], prices[tk], 0.0) for tk in prices}
