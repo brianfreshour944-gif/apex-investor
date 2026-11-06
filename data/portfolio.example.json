@@ -1,0 +1,9 @@
+{
+  "starting_cash": 4000.0,
+  "_comment": "EXAMPLE ONLY - not the operator's real portfolio. Replace with a real snapshot only after explicit approval. This file is never read unless passed explicitly with --portfolio.",
+  "holdings": [
+    {"ticker": "VTI", "shares": 20, "cost_basis_ps": 250.0, "tag": "core"},
+    {"ticker": "AAPL", "shares": 5, "cost_basis_ps": 180.0, "tag": "growth"},
+    {"ticker": "KO", "shares": 100, "cost_basis_ps": 55.0, "tag": "core"}
+  ]
+}

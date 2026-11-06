@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+*.db
+*.sqlite3
+*.log
+.pytest_cache/
+.ruff_cache/
+data/cache/
+*.egg-info/
+dist/
+build/
+
+# Real portfolio snapshot is operator data, never committed
+data/portfolio.json
+
+# Operator-maintained corporate-action configuration
+data/known_actions.json
+
+# Agent working notes / local memory are not source
+.openhands/
