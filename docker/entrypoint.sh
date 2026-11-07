@@ -10,10 +10,67 @@
 #                    In live mode a missing portfolio FAILS CLOSED (no report, no demo data).
 set -uo pipefail
 
+# Persistent-storage paths (Coolify mounts volumes here). The app runs as APP_UID/APP_GID.
+APP_UID=10001
+APP_GID=10001
+DATA_DIR=/app/data
+REPORTS_DIR=/app/reports
+
+# --- ownership repair, then drop privileges (root only) ---------------------
+# An EXISTING named volume (or a Coolify bind mount, whose host directory is created as root)
+# is NOT re-seeded by the image, so it can be root-owned while the app runs as UID 10001. That
+# is exactly the failure this block fixes: the report generates but cannot be saved. Root runs
+# ONLY this repair; the scheduler and the Python process run as APP_UID. We deliberately do not
+# loosen the directory to world-writable as a shortcut.
+if [ "$(id -u)" -eq 0 ]; then
+  # Deliberate, verified privilege-drop mechanism. Do not fail obscurely if it is absent.
+  if ! command -v setpriv >/dev/null 2>&1; then
+    echo "FATAL: setpriv is required to drop privileges but was not found" >&2
+    exit 1
+  fi
+
+  mkdir -p "$DATA_DIR" "$REPORTS_DIR/daily" || {
+    echo "FATAL: cannot create persistent directories ($DATA_DIR, $REPORTS_DIR/daily)" >&2
+    exit 1
+  }
+
+  # Do NOT silently ignore a repair failure: if ownership cannot be fixed, stop with a clear
+  # error rather than starting a scheduler that will fail on every write.
+  if ! chown -R "$APP_UID:$APP_GID" "$DATA_DIR" "$REPORTS_DIR"; then
+    echo "FATAL: cannot repair persistent-volume ownership ($DATA_DIR, $REPORTS_DIR)" >&2
+    exit 1
+  fi
+
+  # Mark this re-exec so the unprivileged run is recognised as the legitimate post-drop run.
+  export APEX_ENTRYPOINT_PRIVDROPPED=1
+  exec setpriv --reuid="$APP_UID" --regid="$APP_GID" --init-groups -- "$0" "$@"
+fi
+
+# Anything reaching here is the unprivileged process; it MUST be APP_UID. A mismatch (e.g. a
+# stale compose `user:` directive) is a configuration error, not something to run through.
+if [ "$(id -u)" -ne "$APP_UID" ]; then
+  echo "FATAL: application must run as UID $APP_UID, but is UID $(id -u)" >&2
+  exit 1
+fi
+
+# A container started DIRECTLY as APP_UID (e.g. a `user:` override in the runtime config) skips
+# the root ownership-repair block above, so a mounted volume may still be root-owned and
+# unwritable — the exact failure this entrypoint exists to prevent. Only the legitimate
+# re-executed process carries the marker, so anything else fails closed with an explanation.
+if [ "${APEX_ENTRYPOINT_PRIVDROPPED:-}" != "1" ]; then
+  echo "FATAL: reached application startup as UID $APP_UID without the root ownership-repair step." >&2
+  echo "       Start the container as root (the default) so the entrypoint can repair the" >&2
+  echo "       persistent volumes first; do not start it directly as UID $APP_UID." >&2
+  exit 1
+fi
+
 REPORT_TIME_UTC="${REPORT_TIME_UTC:-21:30}"
 PORTFOLIO_MODE="${PORTFOLIO_MODE:-example}"
 
-cd /app
+cd /app || {
+  echo "FATAL: cannot change to /app" >&2
+  exit 1
+}
 
 # F6: fail visibly on invalid configuration instead of looping forever.
 # A malformed REPORT_TIME_UTC must STOP the container with a clear error, so Coolify shows the
