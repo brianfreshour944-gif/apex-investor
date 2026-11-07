@@ -40,7 +40,7 @@ run_report() {
     if [ -f data/portfolio.json ]; then
       python scripts/daily_report.py
       rc=$?
-      [ "$rc" -eq 0 ] && printf '%s\\n' "$today" > "$STATE_FILE"
+      [ "$rc" -eq 0 ] && printf '%s\n' "$today" > "$STATE_FILE"
       [ "$rc" -ne 0 ] && echo "WARNING: report run exited non-zero ($rc) — day not marked done"
     else
       echo "PORTFOLIO_MODE=live but data/portfolio.json is missing — FAILING CLOSED, no report."
@@ -49,7 +49,7 @@ run_report() {
     echo "NOTE: PORTFOLIO_MODE=example — demo portfolio only, never the live ledger."
     python scripts/daily_report.py --example
     rc=$?
-    [ "$rc" -eq 0 ] && printf '%s\\n' "$today" > "$STATE_FILE"
+    [ "$rc" -eq 0 ] && printf '%s\n' "$today" > "$STATE_FILE"
     [ "$rc" -ne 0 ] && echo "WARNING: report run exited non-zero ($rc) — day not marked done"
   fi
 }
