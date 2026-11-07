@@ -10,7 +10,10 @@ until the operator supplies a real holdings-and-cash snapshot and approves it.
 """
 import argparse
 import json
+import math
+import os
 import sys
+import tempfile
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -39,39 +42,123 @@ EQUITY_HISTORY_LIVE = ROOT / "data" / "equity_history.json"
 EQUITY_HISTORY_EXAMPLE = ROOT / "data" / "equity_history.example.json"
 
 
+class EquityHistoryError(Exception):
+    """The equity-history file is corrupt, unreadable, not a JSON list, or contains malformed
+    records.
+
+    Equity history is account data: a file that cannot be safely interpreted must be preserved
+    and reported, never silently rewritten (which would destroy the real history).
+    """
+
+
+def _valid_date(value: object) -> str | None:
+    """Return the string if it is a real calendar date in EXACT YYYY-MM-DD form, else None.
+
+    `date.fromisoformat` also accepts compact (20261106) and ISO week (2026-W45-1) forms, so we
+    require the parsed date's isoformat() to round-trip exactly to the input.
+    """
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError:
+        return None
+    return value if parsed.isoformat() == value else None
+
+
+def _valid_equity(value: object) -> float | None:
+    """Return `value` as a finite, non-negative float, else None.
+
+    Rejects bool (a subclass of int), NaN, +/-inf and negative values — any of which would
+    contaminate the daily-change calculation.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
+    return float(value)
+
+
+def _is_wellformed_entry(entry: object) -> bool:
+    """True if `entry` is a dict with a valid ISO date and a valid equity value."""
+    if not isinstance(entry, dict):
+        return False
+    return (_valid_date(entry.get("date")) is not None
+            and _valid_equity(entry.get("equity")) is not None)
+
+
 def load_equity_history(path: Path) -> list[dict]:
-    """Read the equity history file. Absent or malformed -> [] (fail closed, first-run behaviour)."""
+    """Read the equity-history file.
+
+    Absent -> [] (first-run behaviour). Present but corrupt/unreadable/not a list -> raise
+    EquityHistoryError so the caller preserves the file instead of overwriting it.
+    """
     if not path.exists():
         return []
     try:
         data = json.loads(path.read_text())
-    except (ValueError, OSError):
-        return []
-    return data if isinstance(data, list) else []
+    except (ValueError, OSError) as e:
+        raise EquityHistoryError(f"corrupt equity history {path}: {e}") from e
+    if not isinstance(data, list):
+        raise EquityHistoryError(f"equity history {path} is not a JSON list")
+    return data
 
 
 def previous_equity_from_history(history: list, report_date: str) -> float | None:
-    """Most recent recorded equity STRICTLY BEFORE `report_date`, else None."""
+    """Most recent recorded equity STRICTLY BEFORE `report_date`, else None.
+
+    Read-only: entries with a malformed date or a non-finite/negative equity are skipped.
+    """
     best: tuple[str, float] | None = None
     for entry in history:
-        if not isinstance(entry, dict):
+        if not _is_wellformed_entry(entry):
             continue
-        d, eq = entry.get("date"), entry.get("equity")
-        if not isinstance(d, str) or not isinstance(eq, (int, float)) or d >= report_date:
+        d = entry["date"]
+        if d >= report_date:
             continue
         if best is None or d > best[0]:
-            best = (d, float(eq))
+            best = (d, float(entry["equity"]))
     return best[1] if best else None
 
 
-def append_equity_history(path: Path, report_date: str, equity: float) -> None:
-    """Record today's equity, replacing any same-date entry (re-runs refine, never duplicate)."""
-    history = [e for e in load_equity_history(path)
-               if isinstance(e, dict) and e.get("date") != report_date]
-    history.append({"date": report_date, "equity": round(float(equity), 2)})
-    history.sort(key=lambda e: e.get("date", ""))
-    path.write_text(json.dumps(history, indent=2))
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Write `text` via a temp file in the same directory then os.replace (atomic on POSIX)."""
+    d = path.parent
+    d.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
+
+def append_equity_history(path: Path, report_date: str, equity: float) -> None:
+    """Record today's equity, replacing any same-date entry (re-runs refine, never duplicate).
+
+    Validates its inputs and refuses to write if the existing file cannot be safely
+    interpreted — corrupt/unreadable/non-list (EquityHistoryError) or containing any malformed
+    record. In every refusal case the original file is left byte-for-byte unchanged. Writes are
+    atomic so an interrupted write cannot truncate the history.
+    """
+    if _valid_date(report_date) is None:
+        raise ValueError(f"invalid report_date: {report_date!r}")
+    eq = _valid_equity(equity)
+    if eq is None:
+        raise ValueError(f"invalid equity: {equity!r}")
+    existing = load_equity_history(path)
+    if not all(_is_wellformed_entry(e) for e in existing):
+        raise EquityHistoryError(
+            f"equity history {path} contains malformed entries; refusing to rewrite it")
+    history = [e for e in existing if e.get("date") != report_date]
+    history.append({"date": report_date, "equity": round(eq, 2)})
+    history.sort(key=lambda e: e["date"])
+    _atomic_write_text(path, json.dumps(history, indent=2))
 
 
 def load_known_actions(path: Path) -> tuple[list[dict], list[str]]:
@@ -213,7 +300,13 @@ def main() -> int:
         return 2
     led, tags = load_portfolio(portfolio)
     history_path = EQUITY_HISTORY_EXAMPLE if args.example else EQUITY_HISTORY_LIVE
-    previous_equity = previous_equity_from_history(load_equity_history(history_path), args.date)
+    try:
+        previous_equity = previous_equity_from_history(load_equity_history(history_path),
+                                                       args.date)
+    except EquityHistoryError as e:
+        print(f"WARNING: {e} — daily change unavailable; the file is preserved, not "
+              "overwritten. Fix or remove it, then re-run.", file=sys.stderr)
+        previous_equity = None
     prices, dates, missing, prev_bars, price_sources = gather_prices(sorted(led.positions),
                                                                      offline=args.offline)
     as_of = max(dates.values()) if dates else None
@@ -242,7 +335,13 @@ def main() -> int:
     if report.equity is not None:
         try:
             append_equity_history(history_path, args.date, report.equity)
+        except EquityHistoryError as e:
+            print(f"WARNING: not updating equity history — {e}. The file is preserved; "
+                  "fix or remove it, then re-run.", file=sys.stderr)
         except OSError as e:
+            # Filesystem failure writing history; the report itself was already written, so
+            # warn rather than fail. Any other exception (ValueError/TypeError/...) is a defect
+            # or invalid input and must propagate loudly, never be masked as a clean run.
             print(f"WARNING: could not update equity history {history_path.name}: {e}",
                   file=sys.stderr)
     if missing:

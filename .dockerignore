@@ -13,6 +13,7 @@ build/
 # Operator / runtime data — never baked into an image
 data/portfolio.json
 data/equity_history*.json
+data/.last_report_run*
 data/known_actions.json
 data/cache/
 reports/

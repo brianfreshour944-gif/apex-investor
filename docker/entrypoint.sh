@@ -23,10 +23,23 @@ if ! printf '%s' "$REPORT_TIME_UTC" | grep -Eq '^([01][0-9]|2[0-3]):[0-5][0-9]$'
   exit 1
 fi
 
+# H4: reject an invalid PORTFOLIO_MODE instead of silently falling through to example mode.
+# Anything other than exactly "live" or "example" is a configuration error, not a demo run.
+case "$PORTFOLIO_MODE" in
+  live|example) ;;
+  *)
+    echo "FATAL: invalid PORTFOLIO_MODE='$PORTFOLIO_MODE' (expected 'live' or 'example')" >&2
+    exit 1
+    ;;
+esac
+
 # F5: same-day idempotency. The scheduler runs once at startup AND once per scheduled time, so a
 # restart on the same day would otherwise duplicate the report (extra backups, noisy audit trail).
 # The state file lives on the persistent volume (/app/data), so the guard survives redeploys.
-STATE_FILE="/app/data/.last_report_run"
+# H5: the state file is PER MODE, so a successful example run can never suppress the day's live
+# report (and vice versa). NOTE: renaming the marker from the old shared ".last_report_run" means
+# the first run after this change will re-run once, even if today was already marked done.
+STATE_FILE="/app/data/.last_report_run.${PORTFOLIO_MODE}"
 
 run_report() {
   local today rc
