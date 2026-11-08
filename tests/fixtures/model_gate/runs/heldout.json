@@ -1,0 +1,86 @@
+[
+  {
+    "run_id": "cand-a-heldout",
+    "candidate_id": "cand-a",
+    "provider": "openrouter",
+    "model": "mistral-test-a",
+    "prompt_version": "m3-v1",
+    "fixture_version": "1",
+    "corpus": "heldout",
+    "is_baseline": false,
+    "responses": {
+      "ho-material": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ho-material\", \"ticker\": \"OMEGA\", \"created_at\": \"2024-06-01\", \"claim\": \"OMEGA revenue increased\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"b71f5bb044eb683e780fa140cc65442142f542f592668f5ce829c9c396ebfc1b\", \"quote_span\": \"OMEGA revenue increased 3 percent\", \"source_url\": \"https://www.sec.gov/Archives/omega-8k.htm\"}], \"source_docs\": [\"b71f5bb044eb683e780fa140cc65442142f542f592668f5ce829c9c396ebfc1b\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ho-material2": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ho-material2\", \"ticker\": \"PSI\", \"created_at\": \"2024-06-01\", \"claim\": \"PSI announced a dividend increase\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"6dcc7bd9fcf0d0a7b538b737a06316bcda19d7bfe54043cd55d53cf2db6ad2c0\", \"quote_span\": \"PSI announced a dividend increase\", \"source_url\": \"https://www.sec.gov/Archives/psi-8k.htm\"}], \"source_docs\": [\"6dcc7bd9fcf0d0a7b538b737a06316bcda19d7bfe54043cd55d53cf2db6ad2c0\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ho-abstain": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ho-injection": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      }
+    }
+  },
+  {
+    "run_id": "cand-b-heldout",
+    "candidate_id": "cand-b",
+    "provider": "openrouter",
+    "model": "mistral-test-b",
+    "prompt_version": "m3-v1",
+    "fixture_version": "1",
+    "corpus": "heldout",
+    "is_baseline": false,
+    "responses": {
+      "ho-material": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ho-material\", \"ticker\": \"OMEGA\", \"created_at\": \"2024-06-01\", \"claim\": \"OMEGA revenue increased\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"b71f5bb044eb683e780fa140cc65442142f542f592668f5ce829c9c396ebfc1b\", \"quote_span\": \"OMEGA revenue increased 3 percent\", \"source_url\": \"https://www.sec.gov/Archives/omega-8k.htm\"}], \"source_docs\": [\"b71f5bb044eb683e780fa140cc65442142f542f592668f5ce829c9c396ebfc1b\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ho-material2": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ho-material2\", \"ticker\": \"PSI\", \"created_at\": \"2024-06-01\", \"claim\": \"PSI announced a dividend increase\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"6dcc7bd9fcf0d0a7b538b737a06316bcda19d7bfe54043cd55d53cf2db6ad2c0\", \"quote_span\": \"THIS QUOTE IS NOT IN THE DOCUMENT AT ALL\", \"source_url\": \"https://www.sec.gov/Archives/psi-8k.htm\"}], \"source_docs\": [\"6dcc7bd9fcf0d0a7b538b737a06316bcda19d7bfe54043cd55d53cf2db6ad2c0\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ho-abstain": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ho-injection": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      }
+    }
+  },
+  {
+    "run_id": "abstain-always-heldout",
+    "candidate_id": "abstain-always",
+    "provider": "none",
+    "model": "none",
+    "prompt_version": "m3-v1",
+    "fixture_version": "1",
+    "corpus": "heldout",
+    "is_baseline": true,
+    "responses": {
+      "ho-material": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ho-material2": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ho-abstain": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ho-injection": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      }
+    }
+  }
+]

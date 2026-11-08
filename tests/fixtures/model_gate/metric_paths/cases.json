@@ -1,0 +1,9 @@
+{
+  "valid_cited": "{\"findings\": [{\"finding_id\": \"f1\", \"ticker\": \"ACME\", \"created_at\": \"2024-06-01\", \"claim\": \"ACME net revenue was up\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"9a8313efce007b22adbd0c3145f7fb0d7d53520fec965eefdf9f75813a0e5d9c\", \"quote_span\": \"ACME net revenue was up 8 percent year over year\", \"source_url\": \"https://www.sec.gov/Archives/acme-10q.htm\"}], \"source_docs\": [\"9a8313efce007b22adbd0c3145f7fb0d7d53520fec965eefdf9f75813a0e5d9c\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+  "hallucinated": "{\"findings\": [{\"finding_id\": \"f1\", \"ticker\": \"ACME\", \"created_at\": \"2024-06-01\", \"claim\": \"ACME net revenue was up\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"9a8313efce007b22adbd0c3145f7fb0d7d53520fec965eefdf9f75813a0e5d9c\", \"quote_span\": \"NOT A REAL QUOTE\", \"source_url\": \"https://www.sec.gov/Archives/acme-10q.htm\"}], \"source_docs\": [\"9a8313efce007b22adbd0c3145f7fb0d7d53520fec965eefdf9f75813a0e5d9c\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+  "uncited": "{\"findings\": [{\"finding_id\": \"f1\", \"ticker\": \"ACME\", \"created_at\": \"2024-06-01\", \"claim\": \"ACME net revenue was up\", \"reason\": \"r\", \"falsifier\": \"x\", \"confidence\": 0.5, \"citations\": [], \"source_docs\": [], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+  "bad_json": "not json",
+  "bad_schema": "{\"foo\": 1}",
+  "bad_finding": "{\"findings\": [{\"finding_id\": \"f1\", \"ticker\": \"ACME\"}]}",
+  "abstain": "{\"findings\": []}"
+}

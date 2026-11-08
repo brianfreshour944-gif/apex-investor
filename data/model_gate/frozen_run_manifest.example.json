@@ -1,0 +1,8 @@
+{
+  "schema_version": "1",
+  "prompt_version": "m3-v1",
+  "candidate_config_hash": "e5575cfaed5ca614f333961e63a488cfb622cfcd55663815b2ac1908781f50d0",
+  "detector_spec_version": "1",
+  "detector_spec_sha256": "4fe693c80be3858c22dbb741a0641e05f50fd09ee490864ea92d8b03c76924b2",
+  "frozen_at": "2024-06-02T00:00:00Z"
+}

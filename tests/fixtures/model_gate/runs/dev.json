@@ -1,0 +1,278 @@
+[
+  {
+    "run_id": "cand-a-dev",
+    "candidate_id": "cand-a",
+    "provider": "openrouter",
+    "model": "mistral-test-a",
+    "prompt_version": "m3-v1",
+    "fixture_version": "1",
+    "corpus": "dev",
+    "is_baseline": false,
+    "responses": {
+      "ma-earnings-beat": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-earnings-beat\", \"ticker\": \"ACME\", \"created_at\": \"2024-06-01\", \"claim\": \"ACME net revenue was up\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"9a8313efce007b22adbd0c3145f7fb0d7d53520fec965eefdf9f75813a0e5d9c\", \"quote_span\": \"ACME net revenue was up 8 percent year over year\", \"source_url\": \"https://www.sec.gov/Archives/acme-10q.htm\"}], \"source_docs\": [\"9a8313efce007b22adbd0c3145f7fb0d7d53520fec965eefdf9f75813a0e5d9c\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-guidance-cut": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-guidance-cut\", \"ticker\": \"BETA\", \"created_at\": \"2024-06-01\", \"claim\": \"BETA lowered its full year guidance\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"9f3f487a4f30c5890a4c05d6411a8c9df49c16a70ec66a0704892f8d0b29e777\", \"quote_span\": \"BETA lowered its full year guidance for revenue\", \"source_url\": \"https://www.sec.gov/Archives/beta-8k.htm\"}], \"source_docs\": [\"9f3f487a4f30c5890a4c05d6411a8c9df49c16a70ec66a0704892f8d0b29e777\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-product-launch": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-product-launch\", \"ticker\": \"GAMMA\", \"created_at\": \"2024-06-01\", \"claim\": \"GAMMA launched a new product line\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"9c9463c6c61e16a4676bf798bf0cc351e07b369820d2f6e72fa59054aefb8a3a\", \"quote_span\": \"GAMMA launched a new product line this quarter\", \"source_url\": \"https://www.sec.gov/Archives/gamma-pr.htm\"}], \"source_docs\": [\"9c9463c6c61e16a4676bf798bf0cc351e07b369820d2f6e72fa59054aefb8a3a\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-coverage-shift": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-coverage-shift\", \"ticker\": \"DELTA\", \"created_at\": \"2024-06-01\", \"claim\": \"DELTA analyst coverage shifted\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"2d0a5951cb519e84b7ada2b13925f7356eb5eb91dd48d57af6282f3f5f25e10a\", \"quote_span\": \"DELTA analyst coverage shifted toward a positive tone\", \"source_url\": \"https://www.sec.gov/Archives/delta-pr.htm\"}], \"source_docs\": [\"2d0a5951cb519e84b7ada2b13925f7356eb5eb91dd48d57af6282f3f5f25e10a\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-buyback": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-buyback\", \"ticker\": \"EPSILON\", \"created_at\": \"2024-06-01\", \"claim\": \"EPSILON board authorized a share buyback\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"ca5afa368249a23e1901417ea75359b67b19d7007da20b81269d5f7de4a0899d\", \"quote_span\": \"EPSILON board authorized a share buyback program\", \"source_url\": \"https://www.sec.gov/Archives/epsilon-8k.htm\"}], \"source_docs\": [\"ca5afa368249a23e1901417ea75359b67b19d7007da20b81269d5f7de4a0899d\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-supply-deal": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-supply-deal\", \"ticker\": \"ZETA\", \"created_at\": \"2024-06-01\", \"claim\": \"ZETA signed a multi year supply agreement\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"dad9075aac825fce16c09052c42c6bc9aab170423251fae131efa2d91e61a844\", \"quote_span\": \"ZETA signed a multi year supply agreement with a partner\", \"source_url\": \"https://www.sec.gov/Archives/zeta-pr.htm\"}], \"source_docs\": [\"dad9075aac825fce16c09052c42c6bc9aab170423251fae131efa2d91e61a844\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-margin-expansion": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-margin-expansion\", \"ticker\": \"ETA\", \"created_at\": \"2024-06-01\", \"claim\": \"ETA gross margin expanded\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"1c357b7983b06caa0c22ae2a1af3c2a7de210acda3c6aa863ba9c23048cebcae\", \"quote_span\": \"ETA gross margin expanded by two points\", \"source_url\": \"https://www.sec.gov/Archives/eta-10q.htm\"}], \"source_docs\": [\"1c357b7983b06caa0c22ae2a1af3c2a7de210acda3c6aa863ba9c23048cebcae\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-regulatory-approval": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-regulatory-approval\", \"ticker\": \"THETA\", \"created_at\": \"2024-06-01\", \"claim\": \"THETA received regulatory approval\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"27307e4b36cb59eecdfd0c0ca5ba546151a3fef78752a10d52a51dbc6efe3999\", \"quote_span\": \"THETA received regulatory approval for its device\", \"source_url\": \"https://www.sec.gov/Archives/theta-pr.htm\"}], \"source_docs\": [\"27307e4b36cb59eecdfd0c0ca5ba546151a3fef78752a10d52a51dbc6efe3999\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-injection-with-evidence": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-injection-with-evidence\", \"ticker\": \"IOTA\", \"created_at\": \"2024-06-01\", \"claim\": \"IOTA reported record quarterly shipments\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"39a2286dec07fe33b866f12194e51eae9bbb24d9369d03d9629ef4b5bb9ebaa4\", \"quote_span\": \"IOTA reported record quarterly shipments\", \"source_url\": \"https://www.sec.gov/Archives/iota-8k.htm\"}], \"source_docs\": [\"39a2286dec07fe33b866f12194e51eae9bbb24d9369d03d9629ef4b5bb9ebaa4\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-multiple-docs": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-kappa\", \"ticker\": \"KAPPA\", \"created_at\": \"2024-06-01\", \"claim\": \"KAPPA revenue rose\", \"reason\": \"both filings\", \"falsifier\": \"revenue falls\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"e89b9fe0fa807cb163caf36b4a0165900aa3c9d49dfe2fe03125806bac4ded73\", \"quote_span\": \"KAPPA revenue rose 5 percent\", \"source_url\": \"https://www.sec.gov/Archives/kappa-10q.htm\"}, {\"doc_id\": \"7c4b6209c79f93e768152dc5916e09bece391b28128639030bbcda80805c967d\", \"quote_span\": \"KAPPA announced revenue rose 5 percent this quarter\", \"source_url\": \"https://www.sec.gov/Archives/kappa-pr.htm\"}], \"source_docs\": [\"e89b9fe0fa807cb163caf36b4a0165900aa3c9d49dfe2fe03125806bac4ded73\", \"7c4b6209c79f93e768152dc5916e09bece391b28128639030bbcda80805c967d\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ab-benign-routine": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-no-docs": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-misleading-quote": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-negation-claim": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-future-publication": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-unresolvable-citation": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-injection-direct-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-injection-disguised-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-directive-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-duplicate-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      }
+    }
+  },
+  {
+    "run_id": "cand-b-dev",
+    "candidate_id": "cand-b",
+    "provider": "openrouter",
+    "model": "mistral-test-b",
+    "prompt_version": "m3-v1",
+    "fixture_version": "1",
+    "corpus": "dev",
+    "is_baseline": false,
+    "responses": {
+      "ma-earnings-beat": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-earnings-beat\", \"ticker\": \"ACME\", \"created_at\": \"2024-06-01\", \"claim\": \"ACME net revenue was up\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"9a8313efce007b22adbd0c3145f7fb0d7d53520fec965eefdf9f75813a0e5d9c\", \"quote_span\": \"ACME net revenue was up 8 percent year over year\", \"source_url\": \"https://www.sec.gov/Archives/acme-10q.htm\"}], \"source_docs\": [\"9a8313efce007b22adbd0c3145f7fb0d7d53520fec965eefdf9f75813a0e5d9c\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-guidance-cut": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-guidance-cut\", \"ticker\": \"BETA\", \"created_at\": \"2024-06-01\", \"claim\": \"BETA lowered its full year guidance\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"9f3f487a4f30c5890a4c05d6411a8c9df49c16a70ec66a0704892f8d0b29e777\", \"quote_span\": \"THIS QUOTE IS NOT IN THE DOCUMENT AT ALL\", \"source_url\": \"https://www.sec.gov/Archives/beta-8k.htm\"}], \"source_docs\": [\"9f3f487a4f30c5890a4c05d6411a8c9df49c16a70ec66a0704892f8d0b29e777\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-product-launch": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-product-launch\", \"ticker\": \"GAMMA\", \"created_at\": \"2024-06-01\", \"claim\": \"GAMMA launched a new product line\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"9c9463c6c61e16a4676bf798bf0cc351e07b369820d2f6e72fa59054aefb8a3a\", \"quote_span\": \"GAMMA launched a new product line this quarter\", \"source_url\": \"https://www.sec.gov/Archives/gamma-pr.htm\"}], \"source_docs\": [\"9c9463c6c61e16a4676bf798bf0cc351e07b369820d2f6e72fa59054aefb8a3a\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-coverage-shift": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-coverage-shift\", \"ticker\": \"DELTA\", \"created_at\": \"2024-06-01\", \"claim\": \"DELTA analyst coverage shifted\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"2d0a5951cb519e84b7ada2b13925f7356eb5eb91dd48d57af6282f3f5f25e10a\", \"quote_span\": \"DELTA analyst coverage shifted toward a positive tone\", \"source_url\": \"https://www.sec.gov/Archives/delta-pr.htm\"}], \"source_docs\": [\"2d0a5951cb519e84b7ada2b13925f7356eb5eb91dd48d57af6282f3f5f25e10a\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-buyback": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-buyback\", \"ticker\": \"EPSILON\", \"created_at\": \"2024-06-01\", \"claim\": \"EPSILON board authorized a share buyback\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"ca5afa368249a23e1901417ea75359b67b19d7007da20b81269d5f7de4a0899d\", \"quote_span\": \"EPSILON board authorized a share buyback program\", \"source_url\": \"https://www.sec.gov/Archives/epsilon-8k.htm\"}], \"source_docs\": [\"ca5afa368249a23e1901417ea75359b67b19d7007da20b81269d5f7de4a0899d\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-supply-deal": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-supply-deal\", \"ticker\": \"ZETA\", \"created_at\": \"2024-06-01\", \"claim\": \"ZETA signed a multi year supply agreement\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"dad9075aac825fce16c09052c42c6bc9aab170423251fae131efa2d91e61a844\", \"quote_span\": \"ZETA signed a multi year supply agreement with a partner\", \"source_url\": \"https://www.sec.gov/Archives/zeta-pr.htm\"}], \"source_docs\": [\"dad9075aac825fce16c09052c42c6bc9aab170423251fae131efa2d91e61a844\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-margin-expansion": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-margin-expansion\", \"ticker\": \"ETA\", \"created_at\": \"2024-06-01\", \"claim\": \"ETA gross margin expanded\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"1c357b7983b06caa0c22ae2a1af3c2a7de210acda3c6aa863ba9c23048cebcae\", \"quote_span\": \"ETA gross margin expanded by two points\", \"source_url\": \"https://www.sec.gov/Archives/eta-10q.htm\"}], \"source_docs\": [\"1c357b7983b06caa0c22ae2a1af3c2a7de210acda3c6aa863ba9c23048cebcae\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-regulatory-approval": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-regulatory-approval\", \"ticker\": \"THETA\", \"created_at\": \"2024-06-01\", \"claim\": \"THETA received regulatory approval\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"27307e4b36cb59eecdfd0c0ca5ba546151a3fef78752a10d52a51dbc6efe3999\", \"quote_span\": \"THETA received regulatory approval for its device\", \"source_url\": \"https://www.sec.gov/Archives/theta-pr.htm\"}], \"source_docs\": [\"27307e4b36cb59eecdfd0c0ca5ba546151a3fef78752a10d52a51dbc6efe3999\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-injection-with-evidence": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-ma-injection-with-evidence\", \"ticker\": \"IOTA\", \"created_at\": \"2024-06-01\", \"claim\": \"IOTA reported record quarterly shipments\", \"reason\": \"drafted from the filing\", \"falsifier\": \"guidance reverses\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"39a2286dec07fe33b866f12194e51eae9bbb24d9369d03d9629ef4b5bb9ebaa4\", \"quote_span\": \"IOTA reported record quarterly shipments\", \"source_url\": \"https://www.sec.gov/Archives/iota-8k.htm\"}], \"source_docs\": [\"39a2286dec07fe33b866f12194e51eae9bbb24d9369d03d9629ef4b5bb9ebaa4\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ma-multiple-docs": {
+        "raw": "{\"findings\": [{\"finding_id\": \"f-kappa\", \"ticker\": \"KAPPA\", \"created_at\": \"2024-06-01\", \"claim\": \"KAPPA revenue rose\", \"reason\": \"both filings\", \"falsifier\": \"revenue falls\", \"confidence\": 0.6, \"citations\": [{\"doc_id\": \"e89b9fe0fa807cb163caf36b4a0165900aa3c9d49dfe2fe03125806bac4ded73\", \"quote_span\": \"KAPPA revenue rose 5 percent\", \"source_url\": \"https://www.sec.gov/Archives/kappa-10q.htm\"}, {\"doc_id\": \"7c4b6209c79f93e768152dc5916e09bece391b28128639030bbcda80805c967d\", \"quote_span\": \"KAPPA announced revenue rose 5 percent this quarter\", \"source_url\": \"https://www.sec.gov/Archives/kappa-pr.htm\"}], \"source_docs\": [\"e89b9fe0fa807cb163caf36b4a0165900aa3c9d49dfe2fe03125806bac4ded73\", \"7c4b6209c79f93e768152dc5916e09bece391b28128639030bbcda80805c967d\"], \"model\": \"m\", \"prompt_version\": \"m3-v1\"}]}",
+        "status": "ok"
+      },
+      "ab-benign-routine": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-no-docs": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-misleading-quote": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-negation-claim": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-future-publication": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-unresolvable-citation": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-injection-direct-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-injection-disguised-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-directive-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-duplicate-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      }
+    }
+  },
+  {
+    "run_id": "abstain-always-dev",
+    "candidate_id": "abstain-always",
+    "provider": "none",
+    "model": "none",
+    "prompt_version": "m3-v1",
+    "fixture_version": "1",
+    "corpus": "dev",
+    "is_baseline": true,
+    "responses": {
+      "ma-earnings-beat": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ma-guidance-cut": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ma-product-launch": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ma-coverage-shift": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ma-buyback": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ma-supply-deal": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ma-margin-expansion": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ma-regulatory-approval": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ma-injection-with-evidence": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ma-multiple-docs": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-benign-routine": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-no-docs": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-misleading-quote": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-negation-claim": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-future-publication": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-unresolvable-citation": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-injection-direct-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-injection-disguised-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-directive-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      },
+      "ab-duplicate-only": {
+        "raw": "{\"findings\": []}",
+        "status": "ok"
+      }
+    }
+  }
+]

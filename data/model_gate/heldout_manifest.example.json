@@ -1,0 +1,6 @@
+{
+  "schema_version": "1",
+  "heldout_fixture_version": "1",
+  "heldout_fixture_sha256": "a4053785e2f995adbc16086e38fdc64d92c2163383998442ccd179bd3dee9a50",
+  "path": "tests/fixtures/model_gate/heldout_corpus.v1.json"
+}

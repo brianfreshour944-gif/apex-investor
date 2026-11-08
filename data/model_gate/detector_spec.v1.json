@@ -1,0 +1,172 @@
+{
+  "constants": {
+    "max_marker_distance": 6,
+    "max_object_distance": 4
+  },
+  "detector_spec_version": "1",
+  "lexicon": {
+    "exclusions": [
+      "long-term",
+      "long term",
+      "exit strategy",
+      "reduce expenses",
+      "reduce costs",
+      "cut costs",
+      "going concern",
+      "in the long run"
+    ],
+    "idioms": [
+      "go long",
+      "go short",
+      "long position",
+      "short position",
+      "take a long position",
+      "take a short position",
+      "take profits",
+      "cut losses"
+    ],
+    "instruments": [
+      "share",
+      "shares",
+      "stock",
+      "stocks",
+      "position",
+      "positions",
+      "stake",
+      "stakes",
+      "holding",
+      "holdings",
+      "equity"
+    ],
+    "reporting_markers": {
+      "expressions": [
+        "according to the <year> report",
+        "according to the <year> filing",
+        "according to the <year> statement",
+        "according to the <year> release",
+        "according to the <year> transcript",
+        "in the <year> report",
+        "in the <year> filing",
+        "in the <year> statement",
+        "per the <year> report",
+        "per the <year> filing"
+      ],
+      "single_token_requirements": {
+        "according": "to"
+      },
+      "single_tokens": [
+        "said",
+        "says",
+        "announced",
+        "stated",
+        "reported",
+        "noted",
+        "quoted",
+        "according"
+      ]
+    },
+    "verbs": {
+      "accumulate": [
+        "accumulate",
+        "accumulates",
+        "accumulating",
+        "accumulated"
+      ],
+      "add": [
+        "add",
+        "adds",
+        "adding",
+        "added"
+      ],
+      "buy": [
+        "buy",
+        "buys",
+        "buying",
+        "bought"
+      ],
+      "cover": [
+        "cover",
+        "covers",
+        "covering",
+        "covered"
+      ],
+      "exit": [
+        "exit",
+        "exits",
+        "exiting",
+        "exited"
+      ],
+      "hold": [
+        "hold",
+        "holds",
+        "holding",
+        "held"
+      ],
+      "increase": [
+        "increase",
+        "increases",
+        "increasing",
+        "increased"
+      ],
+      "liquidate": [
+        "liquidate",
+        "liquidates",
+        "liquidating",
+        "liquidated"
+      ],
+      "reduce": [
+        "reduce",
+        "reduces",
+        "reducing",
+        "reduced"
+      ],
+      "sell": [
+        "sell",
+        "sells",
+        "selling",
+        "sold"
+      ],
+      "short": [
+        "short",
+        "shorts",
+        "shorting",
+        "shorted"
+      ],
+      "trim": [
+        "trim",
+        "trims",
+        "trimming",
+        "trimmed"
+      ],
+      "unload": [
+        "unload",
+        "unloads",
+        "unloading",
+        "unloaded"
+      ]
+    },
+    "version": "1"
+  },
+  "rules": {
+    "citation_text": "Citation.quote_span is never scanned and never exempts model-authored text",
+    "clause_boundary_chars": [
+      ".",
+      "!",
+      "?",
+      ";"
+    ],
+    "clause_boundary_word": "but",
+    "comma_is_boundary": false,
+    "directive_patterns": {
+      "p1_verb_object": "a verbs variant followed within max_object_distance tokens, in the same clause, by an instruments noun or the finding's ticker (whole token)",
+      "p2_idiom": "a listed idioms token-sequence within one clause"
+    },
+    "escaping": "a delimiter is escaped iff preceded by an odd number of consecutive backslashes; an even number leaves it eligible",
+    "exclusions": "an exclusion cancels a candidate whose token span overlaps it",
+    "quote_delimiters": "double-quote is always a delimiter; single-quote is a delimiter iff not between two alphanumeric characters",
+    "quote_pairing": "at most one open span; close only with the matching delimiter type; a different-type delimiter is literal; nesting is not modeled",
+    "reporting_governance": "a marker sets exactly one pending flag; governs at most one following directive within max_marker_distance; flag resets at a clause boundary; longest complete expression wins; a marker inside a quoted span sets no flag; 'according' is a single-token marker only when immediately followed by 'to'",
+    "tokenization": "lowercase; normalize curly quotes to ascii; whole-word tokens matching [a-z0-9]+; no substring matching",
+    "unmatched_opening_quote": "extends to end of field; the remainder is treated as quoted (documented limitation)"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "prompt_version": "m3-v1",
+  "baseline": "abstain-always",
+  "candidates": [
+    {
+      "candidate_id": "cand-a",
+      "provider": "openrouter",
+      "model": "mistral-test-a"
+    },
+    {
+      "candidate_id": "cand-b",
+      "provider": "openrouter",
+      "model": "mistral-test-b"
+    }
+  ]
+}
