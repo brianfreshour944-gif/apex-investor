@@ -53,6 +53,7 @@ def workspace(tmp_path, monkeypatch):
 
     monkeypatch.setattr(daily_report, "KNOWN_ACTIONS_FILE", tmp_path / "known_actions.json")
     monkeypatch.setattr(daily_report, "LIVE_PORTFOLIO", portfolio)
+    monkeypatch.setattr(daily_report, "EQUITY_HISTORY_LIVE", tmp_path / "equity_history.json")
     monkeypatch.setattr(daily_report, "fetch_bars_sourced",
                         lambda tk, **k: (_load_cache(cache, tk), "cache"))
     monkeypatch.setattr(daily_report, "write_report", lambda report, **k: tmp_path / "out.md")
