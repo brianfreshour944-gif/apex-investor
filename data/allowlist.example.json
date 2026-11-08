@@ -1,0 +1,11 @@
+{
+  "_comment": "M2 approved-source allowlist. Copy to data/allowlist.json (git-ignored) and edit. Host matching is EXACT (no wildcards): sec.gov and www.sec.gov are separate entries.",
+  "domains": [
+    "sec.gov",
+    "www.sec.gov"
+  ],
+  "ticker_domains": {
+    "AAPL": ["investor.apple.com"],
+    "MSFT": ["www.microsoft.com"]
+  }
+}
