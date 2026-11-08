@@ -26,6 +26,21 @@ data/portfolio.json
 # Operator-maintained corporate-action configuration
 data/known_actions.json
 
+# Phase 2 document store (retrieved filings/reports; runtime data, never source)
+data/docs/
+
+# M3a model-gate corpus materialization (runtime document stores; never source)
+data/docs_model_gate_dev/
+data/docs_model_gate_heldout/
+
+# M3a model-gate selection artifacts (runtime output)
+reports/m3a/
+
+# Phase 2 (M2) ingestion configuration and runtime inputs (machine-specific, never source)
+data/allowlist.json
+data/seeds.json
+data/user_agent.txt
+
 # Agent working notes / local memory are not source
 .openhands/
 
