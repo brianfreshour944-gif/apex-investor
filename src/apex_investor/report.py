@@ -12,10 +12,12 @@ Design:
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from .advisory import AdvisorySection
 from .ledger import Ledger
 from .monitor import Alert, dedupe
 from .risk import RiskAssessment, RiskLimits, assess
@@ -49,6 +51,35 @@ def _pct(x: float | None) -> str:
     return "n/a" if x is None else f"{x:+.2%}"
 
 
+def _render_published(status: str, published_at: str | None) -> str:
+    """Render a publication date WITHOUT ever implying freshness."""
+    if status == "known":
+        return published_at or "unknown"
+    if status == "invalid":
+        return "invalid (not used for recency)"
+    return "unknown"
+
+
+# Markdown-active characters in untrusted advisory text (source quotes, claims, titles, URLs).
+_MD_SPECIAL = re.compile(r"([\\`*_{}\[\]()#+!|<>])")
+# Other C0 controls (excluding tab, handled separately), DEL, and C1 controls.
+_MD_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x80-\x9f]")
+
+
+def _md_safe(value: object) -> str:
+    """Neutralize untrusted advisory text for a single Markdown line.
+
+    Advisory values (quotes, claims, reasons, URLs, titles, model metadata) originate outside the
+    renderer. This collapses CR/LF/tab to spaces, removes any remaining C0/C1 control characters,
+    then escapes the listed Markdown structural characters. Result: the value stays on ONE line as
+    literal text and cannot inject a heading, list item, section, link, or emphasis.
+    """
+    text = "" if value is None else str(value)
+    text = text.replace("\r\n", " ").replace("\r", " ").replace("\n", " ").replace("\t", " ")
+    text = _MD_CONTROL.sub("", text)
+    return _MD_SPECIAL.sub(r"\\\1", text)
+
+
 @dataclass
 class DailyReport:
     date: str
@@ -70,6 +101,7 @@ class DailyReport:
     preserved_original: str | None = None
     extra_evidence: dict = field(default_factory=dict)
     config_problems: list[str] = field(default_factory=list)
+    advisory: AdvisorySection | None = None
 
     # ---- derived -----------------------------------------------------
     @property
@@ -245,10 +277,59 @@ class DailyReport:
         for section in (self._snapshot, self._risk, self._alerts,
                         self._evidence, self._blocked, self._summary):
             lines += section()
+        lines += self._advisory()
         return "\n".join(lines).rstrip() + "\n"
 
     def to_console(self) -> str:
         return self.to_markdown().rstrip()
+
+    # ---- advisory (Phase 2 / M5) -------------------------------------
+    def _advisory(self) -> list[str]:
+        """Render the advisory section, or [] when no advisory was requested.
+
+        Returns [] when `advisory is None`, so the Phase 1 report is byte-identical. Rendering is
+        total and guarded: any ordinary error (never BaseException) degrades to the fallback text
+        rather than breaking the daily report.
+        """
+        if self.advisory is None:
+            return []
+        try:
+            return self._render_advisory()
+        except Exception:  # noqa: BLE001 - deliberately catch-all so Phase 1 always renders
+            return ["## 7. Interpretation (advisory)", "", "No interpretation available.", ""]
+
+    def _render_advisory(self) -> list[str]:
+        lines = ["## 7. Interpretation (advisory)", "",
+                 f"_Advisory only — not a trade instruction. {NO_TRADE_NOTE}_", ""]
+        section = self.advisory
+        if not section.available:
+            lines += ["No interpretation available.", ""]
+            return lines
+        if not section.items:
+            lines += ["No findings.", ""]
+            return lines
+        for item in section.items:
+            lines.append(f"### {_md_safe(item.ticker)} — finding {_md_safe(item.finding_id)}")
+            lines.append(f"- Claim: {_md_safe(item.claim)}")
+            lines.append(f"- Reason: {_md_safe(item.reason)}")
+            lines.append(f"- Falsifier: {_md_safe(item.falsifier)}")
+            lines.append(f"- Confidence: {item.confidence:.2f}")
+            lines.append(f"- Model: {_md_safe(item.model)} (prompt {_md_safe(item.prompt_version)})")
+            if item.recency == "unknown":
+                lines.append("- Recency: unknown (a supporting document's publication date is "
+                             "unknown or invalid; freshness not asserted)")
+            else:
+                age = "n/a" if item.evidence_age_days is None else f"{item.evidence_age_days} days old"
+                lines.append(f"- Recency: {item.recency} (oldest supporting evidence {age})")
+            lines.append("- Evidence:")
+            for ev in item.evidence:
+                lines.append(f'  - "{_md_safe(ev.quote)}"')
+                title = f" ({_md_safe(ev.title)})" if ev.title else ""
+                lines.append(f"    - source: {_md_safe(ev.source_url)}{title} (doc {_md_safe(ev.doc_id)})")
+                lines.append(f"    - published: {_render_published(ev.published_at_status, ev.published_at)}"
+                             f" · retrieved: {_md_safe(ev.retrieved_at)}")
+            lines.append("")
+        return lines
 
 
 def build_report(date: str, ledger: Ledger, prices: dict[str, float], *,
@@ -262,7 +343,8 @@ def build_report(date: str, ledger: Ledger, prices: dict[str, float], *,
                  quote_checks: list[QuoteCheck] | None = None,
                  missing_tickers: list[str] | None = None,
                  config_problems: list[str] | None = None,
-                 price_sources: dict[str, str] | None = None) -> DailyReport:
+                 price_sources: dict[str, str] | None = None,
+                 advisory: AdvisorySection | None = None) -> DailyReport:
     """Assemble a DailyReport from the ledger, prices and alerts. Deterministic.
 
     FAIL CLOSED on stale, missing or unvalidatable price data:
@@ -392,6 +474,7 @@ def build_report(date: str, ledger: Ledger, prices: dict[str, float], *,
         volume_baseline_days=volume_baseline_days, risk_limits=limits,
         quote_checks=checks, config_problems=config_list,
         price_sources=dict(price_sources or {}),
+        advisory=advisory,
     )
 
 
