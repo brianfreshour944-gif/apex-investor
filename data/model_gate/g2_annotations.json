@@ -1,0 +1,153 @@
+{
+ "annotation_version": "g2-pilot-draft-2",
+ "pilot": "G2 six-scenario pilot",
+ "as_of": "2026-11-09T00:24:40Z",
+ "note": "Reference values are operator annotations; not machine-scored. Values below were checked against the captured filing bytes by the agent. Treat as verified-against-filing, not yet approved as ground truth.",
+ "documents": [
+  {
+   "sym": "MSFT-FY2025",
+   "ticker": "MSFT",
+   "cik": "0000789019",
+   "accession_number": "0000950170-25-100235",
+   "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm",
+   "filing_date": "2025-07-30",
+   "period_ended": "2025-06-30",
+   "captured_bytes": 8158175,
+   "capture_sha256": "69527c6341b87e0e936da0aba7ee6eb99d1d65b2fd4ecbedae6d11038664df04",
+   "excerpt_anchor_offset": 964225,
+   "capture_hash_scope": "sha256 over the exact received response bytes, before extraction"
+  },
+  {
+   "sym": "AAPL-FY2025",
+   "ticker": "AAPL",
+   "cik": "0000320193",
+   "accession_number": "0000320193-25-000079",
+   "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm",
+   "filing_date": "2025-10-31",
+   "period_ended": "2025-09-27",
+   "captured_bytes": 1520316,
+   "capture_sha256": "1f5680186905f175dc44f12f94c60365a8dd2864dca75a7f67a50170eb360907",
+   "excerpt_anchor_offset": 520152,
+   "capture_hash_scope": "sha256 over the exact received response bytes, before extraction"
+  },
+  {
+   "sym": "F-FY2025",
+   "ticker": "F",
+   "cik": "0000037996",
+   "accession_number": "0000037996-26-000015",
+   "source_url": "https://www.sec.gov/Archives/edgar/data/37996/000003799626000015/f-20251231.htm",
+   "filing_date": "2026-02-11",
+   "period_ended": "2025-12-31",
+   "captured_bytes": 5281610,
+   "capture_sha256": "deaf1c75bd24ffb9c9c2bb06831a629fdfc0f044add9dd8d5bc1c524a8f636ac",
+   "excerpt_anchor_offset": 1795512,
+   "capture_hash_scope": "sha256 over the exact received response bytes, before extraction"
+  },
+  {
+   "sym": "MSFT-FY2026",
+   "ticker": "MSFT",
+   "cik": "0000789019",
+   "accession_number": "0001193125-26-323660",
+   "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526323660/msft-20260630.htm",
+   "filing_date": "2026-07-29",
+   "period_ended": "2026-06-30",
+   "captured_bytes": 8585609,
+   "capture_sha256": "909ff68b1e17b669c27a8788a96c1775d218c03569bd7de4946b9c0bc13c463a",
+   "excerpt_anchor_offset": 984664,
+   "capture_hash_scope": "sha256 over the exact received response bytes, before extraction"
+  },
+  {
+   "sym": "AAPL-FY2026",
+   "ticker": "AAPL",
+   "cik": "0000320193",
+   "accession_number": "0000320193-26-000026",
+   "source_url": "https://www.sec.gov/Archives/edgar/data/320193/000032019326000026/aapl-20260926.htm",
+   "filing_date": "2026-11-03",
+   "period_ended": "2026-09-26",
+   "captured_bytes": 1650111,
+   "capture_sha256": "f4609015ee438eca895662eadf2e52502aa81d1f5c46638019019e582120bd73",
+   "excerpt_anchor_offset": 406824,
+   "capture_hash_scope": "sha256 over the exact received response bytes, before extraction"
+  }
+ ],
+ "scenarios": [
+  {
+   "scenario_id": "DEV-01",
+   "document_sym": "MSFT-FY2025",
+   "expected_behavior": "answer",
+   "measure": "total revenue",
+   "measure_definition": "GAAP total revenue for the fiscal year, consolidated statement of operations",
+   "reference_value": 281724,
+   "reference_unit": "USD millions",
+   "human_verification": "verified-against-filing",
+   "verified_by": "agent",
+   "verified_at": "2026-11-08",
+   "notes": "Filing row: Revenue $281,724 (FY2024 $245,122)."
+  },
+  {
+   "scenario_id": "DEV-02",
+   "document_sym": "AAPL-FY2025",
+   "expected_behavior": "answer",
+   "measure": "net income",
+   "measure_definition": "GAAP net income for the fiscal year, consolidated statements of operations",
+   "reference_value": 112010,
+   "reference_unit": "USD millions",
+   "human_verification": "verified-against-filing",
+   "verified_by": "agent",
+   "verified_at": "2026-11-08",
+   "notes": "Filing row: Net income $112,010 (FY2024 $93,736)."
+  },
+  {
+   "scenario_id": "DEV-03",
+   "document_sym": "F-FY2025",
+   "expected_behavior": "answer",
+   "measure": "consolidated net income or loss",
+   "measure_definition": "consolidated result including noncontrolling interests; distinct from the amount attributable to Ford Motor Company",
+   "reference_value": -8162,
+   "reference_unit": "USD millions",
+   "human_verification": "verified-against-filing",
+   "verified_by": "agent",
+   "verified_at": "2026-11-08",
+   "notes": "Consolidated net loss $(8,162). Parent-attributable $(8,182). Adjusted EBIT $6,780 (non-GAAP)."
+  },
+  {
+   "scenario_id": "HOLD-01",
+   "document_sym": "MSFT-FY2026",
+   "expected_behavior": "answer",
+   "measure": "net income",
+   "measure_definition": "GAAP net income for the fiscal year, consolidated income statement",
+   "reference_value": 133749,
+   "reference_unit": "USD millions",
+   "human_verification": "verified-against-filing",
+   "verified_by": "agent",
+   "verified_at": "2026-11-08",
+   "notes": "Filing row: Net income 133,749 (FY2025 101,832). Adjusted net income 128,786 is non-GAAP."
+  },
+  {
+   "scenario_id": "HOLD-02",
+   "document_sym": "AAPL-FY2026",
+   "expected_behavior": "answer",
+   "measure": "total net sales",
+   "measure_definition": "GAAP total net sales for the fiscal year, consolidated statement of operations",
+   "reference_value": 478834,
+   "reference_unit": "USD millions",
+   "human_verification": "verified-against-filing",
+   "verified_by": "agent",
+   "verified_at": "2026-11-08",
+   "notes": "Filing row: Total net sales 478,834 (FY2025 416,161)."
+  },
+  {
+   "scenario_id": "HOLD-03",
+   "document_sym": "MSFT-FY2026",
+   "expected_behavior": "abstain",
+   "measure": "FY2027 first-quarter revenue",
+   "measure_definition": "not established by the supplied FY2026 annual filing",
+   "reference_value": null,
+   "human_verification": "verified-against-filing",
+   "verified_by": "agent",
+   "verified_at": "2026-11-08",
+   "notes": "FY2026 10-K covers the year ended 2026-06-30 and does not establish FY2027 Q1. Abstain because the supplied filing does not establish it, not because it is unavailable generally."
+  }
+ ],
+ "capture_time_note": "Capture window 2026-11-09T00:24:40Z..00:24:45Z (file mtimes, UTC). Confirmed by SEC HTTP Date header 2026-11-09T00:31:32Z. Machine TZ = UTC (no /etc/timezone, TZ unset). No HTTP headers were saved at capture; Date re-confirmed via HEAD after the fact."
+}

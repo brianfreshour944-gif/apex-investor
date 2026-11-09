@@ -1,0 +1,10 @@
+{
+  "closure_sha256": "77411945fc28d16ca7810b0ee2b455db49d07fadaca85913ac79b15d5688e2d4",
+  "format_version": "1",
+  "members": {
+    "src/apex_investor/citation.py": "49067e65c8bc5118ce4f8b811ed43976c6b14580d17395ccc8eb1d4da62c3c01",
+    "src/apex_investor/docstore.py": "5655a7d7bf8b2a20ccf1c09b406c4d57a6e3579f8a4241d4a93455d839464edd",
+    "src/apex_investor/model_gate.py": "421286c6406fd9de602c40faa4961bc38aa6f1ffcbcd0aeea57715105714dcf5",
+    "src/apex_investor/sanitize.py": "099a7c6723b9eccfd12e2c36226c57fffbb1531cda97c59fafe3a780858896dc"
+  }
+}

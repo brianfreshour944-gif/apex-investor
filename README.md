@@ -76,3 +76,89 @@ Three gates guard every quote before it can reach valuation or risk:
 Optional `data/known_actions.json` lets the operator declare corporate actions that explain a
 large move, so the guard flags rather than blocks them.
 
+## Model gate CLI — run from the repository root
+
+The offline model-quality gate is `scripts/model_gate.py`. Its default paths for the detector spec and
+lexicon (`data/model_gate/detector_spec.v1.json`, `data/model_gate/lexicon.v1.json`) are **relative to
+the current working directory**. Invoke the CLI from the repository root; from any other directory it
+fails closed with a `detector spec not found` error unless every path is overridden explicitly. This
+documents the existing requirement — it does not change CLI behavior or any default path.
+
+```
+python scripts/model_gate.py \
+  --config <config.json> --freeze-manifest <manifest.json> \
+  --dev-corpus <dev.json> --dev-runs <dev-runs.json> \
+  --heldout-manifest <heldout-manifest.json> --heldout-runs <heldout-runs.json>
+```
+
+Run the test suite from the repository root as well (`pytest tests/`).
+
+### Freeze authorization — evaluator identity (B1)
+
+A frozen run must be provably scored by a known evaluator. The evaluator is not a single file: its
+scoring closure is the set of modules whose code can change a score:
+
+- `src/apex_investor/model_gate.py`
+- `src/apex_investor/citation.py`
+- `src/apex_investor/docstore.py`
+- `src/apex_investor/sanitize.py`
+
+Two source-controlled artifacts define and authorize that closure:
+
+- `data/model_gate/evaluator_closure.v1.json` — the **inventory**: the exact member set and each
+  member's SHA-256, plus a deterministic `closure_sha256` (sha256 over the canonical, sorted
+  `{path: sha256}` map).
+- `data/model_gate/freeze_authority.v1.json` — the **authority**: pins the inventory file's SHA-256
+  (`expected_inventory_sha256`), the expected `closure_sha256`, and the exact `expected_members`.
+
+Three distinct SHA-256 values are involved and must never be conflated:
+
+- the **authority anchor** — the authority file's own SHA-256, supplied out of band on the command
+  line (this is the trust root);
+- the **inventory** — the inventory file's SHA-256, which the authority pins as
+  `expected_inventory_sha256`;
+- the **closure** — `closure_sha256`, the hash of the member map, carried by both the inventory and
+  the authority.
+
+The **authority file's own SHA-256 is the trust anchor and must be supplied independently** (on the
+command line), never read from the inventory it authorizes. The file that is *verified* (the
+inventory) is never the file that *authorizes* (the authority).
+
+Two explicit subcommands perform fail-closed verification:
+
+```
+# verify the authority -> inventory -> closure -> members -> environment chain (no scoring)
+python scripts/model_gate.py freeze-verify --authority-sha256 <authority-file-sha256>
+
+# a freeze-required scoring run: verify FIRST, then score
+python scripts/model_gate.py frozen-run --authority-sha256 <authority-file-sha256> \
+  --config <config.json> --freeze-manifest <manifest.json> \
+  --dev-corpus <dev.json> --dev-runs <dev-runs.json> \
+  --heldout-manifest <heldout-manifest.json> --heldout-runs <heldout-runs.json>
+```
+
+Verification refuses (exit 2, no artifact) on: a missing or mismatched authority SHA-256; an
+inventory whose bytes do not match `expected_inventory_sha256`; a membership set that differs from
+`expected_members`; any member file whose SHA-256 differs; a `closure_sha256` that does not match the
+recomputed value or the authority's expected value; or a missing/mismatched required
+execution-environment field.
+
+The execution-environment identity is recorded discretely: `python_implementation`, `python_version`,
+`os_system`, `os_release`, `architecture`, `libc` (`[name, version]`), and `dependencies`
+(`stdlib-only`).
+
+The **bare command remains the ordinary, backward-compatible path** (`run` is an explicit alias); it
+is unchanged and requires no authority. Freeze enforcement is reachable only through the explicit
+subcommands, so it cannot be bypassed by omitting a flag.
+
+Artifact provenance: a `frozen-run` artifact is schema `"2"` and carries the verified identity in an
+`evaluator` record — the closure hash, the member `path: sha256` mapping, the environment identity,
+and the pinned data-artifact identities (`data_artifacts`). It is written during the original
+exclusive write and never backfilled. `prompt_sha256` is recorded as `null` until the executed prompt
+artifact is threaded through the pipeline; the null is explicit and is not a substituted value. An
+ordinary run is schema `"1"` and has no `evaluator` record (backward compatible).
+
+The `--freeze-manifest` file and the authority chain are **separate layers**: the manifest binds a run
+to its config, prompt version, and detector spec, while the authority chain binds it to the evaluator.
+The freeze manifest does not carry an evaluator hash; evaluator identity is established solely by the
+authority chain.

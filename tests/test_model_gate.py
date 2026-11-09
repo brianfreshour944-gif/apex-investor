@@ -263,7 +263,53 @@ def test_eligibility_zero_tolerance_and_undefined_support():
     assert "citation support rate is undefined (no findings produced)" in fails
 
 
+def test_abstention_empty_denominator_is_undefined_and_skipped():
+    # Option A: no abstention cases -> abstention accuracy is N/A (None), and eligibility SKIPS it.
+    from apex_investor.model_gate import RunVerdict
+    v = RunVerdict(candidate_id="c", provider="p", model="m", prompt_version="x",
+                   is_baseline=False, corpus="dev", run_id="c")
+    v.scenarios_total = 3
+    v.scenario_correct = 3
+    v.must_answer_total = 3
+    v.must_answer_success = 3
+    v.must_abstain_total = 0          # no abstention scenarios
+    v.must_abstain_success = 0
+    v.findings_total = 3
+    v.supported_total = 3
+    assert v.abstention_accuracy is None
+    fails = eligibility_failures(v, Thresholds())
+    assert not any("abstention" in p for p in fails)
+    assert fails == []                # nothing else fails
+
+
+def test_abstention_present_still_enforced_at_one():
+    # When abstention cases exist, min_abstention = 1.00 stays fully enforced (one miss fails).
+    from apex_investor.model_gate import RunVerdict
+    v = RunVerdict(candidate_id="c", provider="p", model="m", prompt_version="x",
+                   is_baseline=False, corpus="dev", run_id="c")
+    v.scenarios_total = 3
+    v.scenario_correct = 3
+    v.must_answer_total = 2
+    v.must_answer_success = 2
+    v.must_abstain_total = 1
+    v.must_abstain_success = 0        # missed the one abstention
+    v.findings_total = 2
+    v.supported_total = 2
+    assert v.abstention_accuracy == 0.0
+    assert "abstention accuracy below the minimum" in eligibility_failures(v, Thresholds())
+
+
+def test_abstention_serializes_as_null_when_undefined():
+    # The artifact record must show null (not 0.0) for an empty abstention denominator.
+    from apex_investor.model_gate import RunVerdict
+    v = RunVerdict(candidate_id="c", provider="p", model="m", prompt_version="x",
+                   is_baseline=False, corpus="dev", run_id="c")
+    v.must_abstain_total = 0
+    assert v.as_dict()["abstention_accuracy"] is None
+
+
 # ---- thresholds validation ----------------------------------------------------------------------
+
 
 def test_threshold_validation_rejects_bad_values():
     for bad in (True, float("nan"), float("inf"), -0.1, 1.5):
@@ -298,6 +344,60 @@ def test_artifact_contract_fields(dev_store, ho_store):
     assert isinstance(entry_a["delta_vs_baseline"]["scenario_accuracy"], float)
     assert entry_a["delta_vs_baseline"]["citation_support_rate"] is None
     assert entry_a["delta_vs_baseline"]["status"]["citation_support_rate"] == "not_comparable"
+
+
+def _evaluator_identity():
+    from apex_investor.evaluator_identity import compute_closure_sha256, environment_identity
+    members = {
+        "src/apex_investor/model_gate.py": "a" * 64,
+        "src/apex_investor/citation.py": "b" * 64,
+        "src/apex_investor/docstore.py": "c" * 64,
+        "src/apex_investor/sanitize.py": "d" * 64,
+    }
+    return {
+        "closure_sha256": compute_closure_sha256(members),
+        "members": members,
+        "environment": environment_identity(),
+        "annotation_authority_sha256": "e" * 64,
+    }
+
+
+def _artifact_kwargs():
+    from apex_investor.model_gate import Selection
+    return dict(
+        run_id="abc123", recorded_at="2024-06-02T00:00:00Z",
+        freeze={"frozen_at": "2024-06-02T00:00:00Z", "candidate_config_hash": "h",
+                "prompt_version": "m3-v1"},
+        fixtures={"dev": {"version": "1", "sha256": canonical_sha256(DEV)},
+                  "heldout": {"version": "1", "sha256": canonical_sha256(HELDOUT)}},
+        prompt_version="m3-v1", detector_spec=SPEC, detector_spec_sha256=SPEC_SHA,
+        thresholds=Thresholds(), candidate_entries=[],
+        selection=Selection(selected_candidate_id="cand-a", provider="openrouter",
+                            model="m", prompt_version="m3-v1", reason="ok"),
+        known_limitations={"version": "1", "items": []})
+
+
+def test_artifact_without_evaluator_stays_schema_1():
+    art = build_artifact(**_artifact_kwargs())
+    assert art["schema_version"] == "1"
+    assert art["evaluator"] is None
+
+
+def test_artifact_with_evaluator_is_schema_2_with_provenance():
+    art = build_artifact(**_artifact_kwargs(), evaluator=_evaluator_identity())
+    assert art["schema_version"] == "2"
+    ev = art["evaluator"]
+    assert set(ev["members"]) == set(_evaluator_identity()["members"])
+    assert ev["closure_sha256"] == _evaluator_identity()["closure_sha256"]
+    assert ev["environment"]["python_implementation"] == "CPython"
+    # prompt hash is explicitly null (not substituted); annotation authority is recorded.
+    assert ev["data_artifacts"]["prompt_sha256"] is None
+    assert ev["data_artifacts"]["annotation_authority_sha256"] == "e" * 64
+    # the evaluator's data-artifact identities AGREE with the existing top-level fields.
+    assert ev["data_artifacts"]["detector_spec_sha256"] == art["detector_spec"]["sha256"]
+    assert ev["data_artifacts"]["directive_lexicon_sha256"] == art["directive_lexicon"]["sha256"]
+    assert ev["data_artifacts"]["dev_corpus_sha256"] == art["fixtures"]["dev"]["sha256"]
+    assert ev["data_artifacts"]["heldout_corpus_sha256"] == art["fixtures"]["heldout"]["sha256"]
 
 
 def test_artifact_never_overwrites(tmp_path):

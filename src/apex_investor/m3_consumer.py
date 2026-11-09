@@ -42,6 +42,10 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .evaluator_identity import (
+    REQUIRED_ENV_FIELDS,
+    compute_closure_sha256,
+)
 from .model_adapter import AdapterError, LiveAdapter
 from .model_gate import (
     DEFAULT_ARTIFACT_DIR,
@@ -55,7 +59,7 @@ from .model_gate import (
 )
 
 DEFAULT_PIN_CONFIG_PATH = Path("data/m3_consumer.json")
-_SUPPORTED_ARTIFACT_SCHEMA_VERSIONS = frozenset({"1"})
+_SUPPORTED_ARTIFACT_SCHEMA_VERSIONS = frozenset({"1", "2"})
 _PIN_CONFIG_KEYS = frozenset({"pinned_run_id"})
 
 # A run_id is used inside a glob pattern, so it must never carry glob metacharacters or path
@@ -223,9 +227,50 @@ def load_selection(artifact_path: Path | str, *, pinned_run_id: str,
              f"pinned artifact selection prompt_version {selection.get('prompt_version')!r} does not "
              f"match the selected candidate's recorded dev prompt_version {dev.get('prompt_version')!r}")
 
+    # (9) schema "2" requires the evaluator provenance record; schema "1" is legacy (no record).
+    _validate_evaluator(artifact, schema_version)
+
     return SelectedModel(candidate_id=selected, provider=selection["provider"],
                          model=selection["model"], prompt_version=selection["prompt_version"],
                          run_id=run_id)
+
+
+def _validate_evaluator(artifact: dict, schema_version: str) -> None:
+    """Fail closed on a schema-"2" artifact's evaluator provenance; ignore it for schema "1".
+
+    A "2" artifact must carry a well-formed evaluator record whose closure hash matches the recomputed
+    hash of its own member hashes, with a complete environment identity. This binds the artifact to
+    the evaluator closure and execution environment that produced it.
+    """
+    if schema_version != "2":
+        return
+    evaluator = artifact.get("evaluator")
+    _require(isinstance(evaluator, dict),
+             'schema "2" artifact is missing its evaluator provenance record')
+    members = evaluator.get("members")
+    _require(isinstance(members, dict) and bool(members),
+             "evaluator record is missing its members mapping")
+    for rel, digest in members.items():
+        _require(isinstance(rel, str) and bool(rel),
+                 "evaluator member path must be a non-empty string")
+        _require(isinstance(digest, str) and bool(digest),
+                 f"evaluator member {rel!r} must map to a sha256 string")
+    closure = evaluator.get("closure_sha256")
+    _require(isinstance(closure, str) and bool(closure),
+             "evaluator record is missing its closure_sha256")
+    _require(closure == compute_closure_sha256(members),
+             "evaluator closure_sha256 does not match the recomputed hash of its members")
+    env = evaluator.get("environment")
+    _require(isinstance(env, dict), "evaluator record is missing its environment identity")
+    for field_name in REQUIRED_ENV_FIELDS:
+        value = env.get(field_name)
+        if field_name == "libc":
+            ok = isinstance(value, (list, tuple)) and len(value) == 2 and all(str(v) for v in value)
+        else:
+            ok = isinstance(value, str) and bool(value)
+        _require(ok, f"evaluator environment identity is missing or malformed: {field_name!r}")
+    _require(isinstance(evaluator.get("data_artifacts"), dict),
+             "evaluator record is missing its data_artifacts identities")
 
 
 def _validate_pinned_run_id(pinned_run_id: str) -> str:

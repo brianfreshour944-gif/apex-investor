@@ -1,0 +1,29 @@
+{
+ "record_type": "g2-annotation-approval",
+ "record_version": "1",
+ "created_at": "2026-11-09",
+ "approved_by": "operator",
+ "approved_by_role": "operator (explicit written authorization)",
+ "approved_at": "2026-11-09",
+ "method": "additive; frozen authority unchanged",
+ "authoritative_source": "data/model_gate/g2_annotations.json",
+ "approved_authority_raw_sha256": "0bc0257b90ad2431ad34db2fdd12d697973e62db619363d9a0aad6f80b224c99",
+ "source_frozen_sha256": "0bc0257b90ad2431ad34db2fdd12d697973e62db619363d9a0aad6f80b224c99",
+ "scope": {
+  "description": "all six reference annotations, including the HOLD-03 abstention",
+  "scenario_ids": [
+   "DEV-01",
+   "DEV-02",
+   "DEV-03",
+   "HOLD-01",
+   "HOLD-02",
+   "HOLD-03"
+  ],
+  "includes_abstention": true
+ },
+ "provenance": {
+  "approval_event_artifact": "/tmp/apex_g2_contract_draft/annotations.operator-approved.draft.json",
+  "approval_event_artifact_sha256": "cdfcb571386f34aa0001493ddf586c3f77fc7ed766a466ea29d276f22094ae08",
+  "note": "Lean reference record. The operator approval event is recorded in the draft artifact above; this record binds that approval to the source-controlled authority by hash. Reference values are NOT duplicated here: the annotation authority (data/model_gate/g2_annotations.json) remains the single source of truth. The frozen snapshot frozen_g2_evidence/packages/_annotations.json is unchanged. No personal approver name exists in the approval evidence; the approver is recorded as the role 'operator'."
+ }
+}

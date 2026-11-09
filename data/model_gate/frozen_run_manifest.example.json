@@ -1,4 +1,5 @@
 {
+  "_comment": "EXAMPLE ONLY. This freeze manifest binds a run to its config, prompt version, and detector spec, which _verify_freeze checks. The evaluator identity is deliberately NOT pinned here: it is enforced separately through the authority chain (data/model_gate/freeze_authority.v1.json, verified by freeze-verify / frozen-run).",
   "schema_version": "1",
   "prompt_version": "m3-v1",
   "candidate_config_hash": "e5575cfaed5ca614f333961e63a488cfb622cfcd55663815b2ac1908781f50d0",

@@ -8,13 +8,22 @@ Held-out gating (fail closed, in this order):
   1. load + verify the frozen-run manifest (candidate_config_hash, prompt_version, detector hash);
   2. refuse held-out scoring if the manifest is absent, the config hash differs, the prompt version
      differs, or the detector-spec hash differs;
-  3. load the held-out corpus from the operator path and verify its sha256 against the manifest.
+  3. load the held-out corpus from the operator path and verify its sha256 against the manifest;
+  4. for a genuine G2 evaluation (corpora whose scenarios carry the `question` field), require the
+     pinned annotation authority and verify BOTH corpora against it before any candidate is scored;
+     synthetic/test-only fixtures (legacy `instruction` field) take the unchanged path.
 
 It never overwrites an artifact (unique, timestamped filename).
+
+Subcommands (fail-closed): `freeze-verify` checks the authority -> inventory -> closure -> members ->
+environment chain; `frozen-run` runs those checks BEFORE scoring and stamps the verified identity into
+a schema-"2" artifact. The bare command (and the `run` alias) is the ordinary, backward-compatible
+path and requires no authority.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import secrets
 import sys
@@ -23,7 +32,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from apex_investor.corpus_consistency import (  # noqa: E402
+    CorpusConsistencyError,
+    assert_genuine_g2_corpora_consistent,
+    is_g2_corpus,
+)
+from apex_investor.evaluator_identity import (  # noqa: E402
+    DEFAULT_AUTHORITY_PATH,
+    EvaluatorIdentityError,
+    verify_freeze_authorization,
+)
 from apex_investor.model_gate import (  # noqa: E402
+    DEFAULT_ANNOTATION_AUTHORITY_PATH,
     DEFAULT_ARTIFACT_DIR,
     DEFAULT_DETECTOR_SPEC_PATH,
     DEFAULT_LEXICON_PATH,
@@ -93,7 +113,14 @@ def _verify_freeze(freeze_manifest: Path, config: dict, detector_sha: str, spec_
     return freeze
 
 
-def main(argv: list[str] | None = None) -> int:
+def _annotation_authority_sha256() -> str | None:
+    p = ROOT / DEFAULT_ANNOTATION_AUTHORITY_PATH
+    if not p.exists():
+        return None
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def _ordinary(argv: list[str], evaluator: dict | None = None) -> int:
     ap = argparse.ArgumentParser(description="M3a model quality gate (offline scoring).")
     ap.add_argument("--detector-spec", type=Path, default=DEFAULT_DETECTOR_SPEC_PATH)
     ap.add_argument("--lexicon", type=Path, default=DEFAULT_LEXICON_PATH)
@@ -131,6 +158,15 @@ def main(argv: list[str] | None = None) -> int:
             raise ModelGateError("held-out corpus hash does not match its manifest")
         heldout_runs = _load_json(args.heldout_runs)
 
+        # Genuine G2 gate (fail closed): before any candidate is scored, require the pinned annotation
+        # authority and verify BOTH corpora against it. Synthetic/test-only fixtures (legacy
+        # `instruction` field) take the unchanged path and are not gated.
+        if is_g2_corpus(dev_corpus) or is_g2_corpus(heldout_corpus):
+            if not (is_g2_corpus(dev_corpus) and is_g2_corpus(heldout_corpus)):
+                raise ModelGateError(
+                    "genuine G2 evaluation requires BOTH corpora to be G2; one corpus is not")
+            assert_genuine_g2_corpora_consistent(dev_corpus, heldout_corpus)
+
         dev_store, _ = materialize_corpus(dev_corpus, ROOT / "data" / "docs_model_gate_dev")
         ho_store, _ = materialize_corpus(heldout_corpus, ROOT / "data" / "docs_model_gate_heldout")
 
@@ -152,6 +188,7 @@ def main(argv: list[str] | None = None) -> int:
             prompt_version=config.get("prompt_version", ""), detector_spec=spec,
             detector_spec_sha256=detector_sha, thresholds=thresholds,
             candidate_entries=entries, selection=selection, known_limitations=KNOWN_LIMITATIONS,
+            evaluator=evaluator,
         )
         path = write_artifact(artifact, args.out_dir, run_id=artifact["run_id"])
         print(f"selection: {selection.selected_candidate_id} ({selection.reason})")
@@ -160,6 +197,71 @@ def main(argv: list[str] | None = None) -> int:
     except ModelGateError as exc:
         print(f"model gate refused: {exc}", file=sys.stderr)
         return 2
+    except CorpusConsistencyError as exc:
+        print(f"model gate refused (corpus/annotation consistency): {exc}", file=sys.stderr)
+        return 2
+
+
+def _freeze_verify(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(prog="model_gate.py freeze-verify",
+                                 description="Verify the freeze authority/inventory/closure/environment.")
+    ap.add_argument("--authority", type=Path, default=DEFAULT_AUTHORITY_PATH)
+    ap.add_argument("--authority-sha256", required=True,
+                    help="the authority file's own SHA-256, supplied independently (out-of-band)")
+    ap.add_argument("--inventory", type=Path, default=None)
+    ap.add_argument("--root", type=Path, default=ROOT)
+    args = ap.parse_args(argv)
+    try:
+        identity = verify_freeze_authorization(
+            root=args.root, authority_sha256=args.authority_sha256,
+            authority_path=args.authority, inventory_path=args.inventory)
+    except EvaluatorIdentityError as exc:
+        print(f"freeze verification refused: {exc}", file=sys.stderr)
+        return 2
+    print(f"closure_sha256:   {identity['closure_sha256']}")
+    print(f"inventory_sha256: {identity['inventory_sha256']}")
+    print(f"authority_sha256: {identity['authority_sha256']}")
+    print("environment:      " + json.dumps(identity["environment"], sort_keys=True))
+    return 0
+
+
+def _frozen_run(argv: list[str]) -> int:
+    # Verify the authority, inventory, closure, and environment BEFORE any scoring artifact is
+    # created. A freeze-required run cannot proceed without a trusted authority pin.
+    ap = argparse.ArgumentParser(prog="model_gate.py frozen-run", add_help=False)
+    ap.add_argument("--authority", type=Path, default=DEFAULT_AUTHORITY_PATH)
+    ap.add_argument("--authority-sha256", required=True)
+    ap.add_argument("--inventory", type=Path, default=None)
+    freeze_args, rest = ap.parse_known_args(argv)
+    try:
+        identity = verify_freeze_authorization(
+            root=ROOT, authority_sha256=freeze_args.authority_sha256,
+            authority_path=freeze_args.authority, inventory_path=freeze_args.inventory)
+    except EvaluatorIdentityError as exc:
+        print(f"model gate refused (freeze authorization): {exc}", file=sys.stderr)
+        return 2
+    # The verified identity is passed straight into the artifact's original exclusive write.
+    identity["annotation_authority_sha256"] = _annotation_authority_sha256()
+    return _ordinary(rest, evaluator=identity)
+
+
+_SUBCOMMANDS = {
+    "freeze-verify": _freeze_verify,
+    "frozen-run": _frozen_run,
+}
+
+
+def main(argv: list[str] | None = None) -> int:
+    # Normalize first, then dispatch on the FIRST element of the normalized argv. At process level
+    # sys.argv[0] is the script filename and the subcommand is sys.argv[1]; in-process (tests) the
+    # subcommand is argv[0]. Never dispatch on raw sys.argv[0].
+    argv = sys.argv[1:] if argv is None else list(argv)
+    cmd = argv[0] if argv else ""
+    if cmd in _SUBCOMMANDS:
+        return _SUBCOMMANDS[cmd](argv[1:])
+    if cmd == "run":
+        return _ordinary(argv[1:])
+    return _ordinary(argv)
 
 
 if __name__ == "__main__":

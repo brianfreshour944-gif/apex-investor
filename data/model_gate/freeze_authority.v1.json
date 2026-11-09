@@ -1,0 +1,12 @@
+{
+  "expected_closure_sha256": "77411945fc28d16ca7810b0ee2b455db49d07fadaca85913ac79b15d5688e2d4",
+  "expected_inventory_sha256": "07be09f19aab381f91064b1fd5d02162a4edec8cba1294308c479e9870cea91e",
+  "expected_members": [
+    "src/apex_investor/citation.py",
+    "src/apex_investor/docstore.py",
+    "src/apex_investor/model_gate.py",
+    "src/apex_investor/sanitize.py"
+  ],
+  "format_version": "1",
+  "inventory_path": "data/model_gate/evaluator_closure.v1.json"
+}

@@ -24,7 +24,7 @@ from apex_investor.m3_consumer import (
 ART = Path(__file__).parent / "fixtures" / "model_gate"
 
 
-def _real_artifact(tmp_path: Path):
+def _real_artifact(tmp_path: Path, *, evaluator=None):
     """Produce a REAL artifact via the producer's build_artifact + write_artifact.
 
     Returns (artifact_path, run_id, expected SelectedModel fields). No monkeypatching, no mocks —
@@ -60,7 +60,7 @@ def _real_artifact(tmp_path: Path):
                       "heldout": {"version": "1", "sha256": "y"}},
             prompt_version="m3-v1", detector_spec=spec, detector_spec_sha256=spec_sha,
             thresholds=Thresholds(), candidate_entries=entries, selection=selection,
-            known_limitations={"version": "1", "items": []})
+            known_limitations={"version": "1", "items": []}, evaluator=evaluator)
         path = write_artifact(art, tmp_path, run_id=run_id)
         return path, run_id, selection
 
@@ -563,3 +563,59 @@ def test_m3_consumer_module_contract_guards():
     assert "separate gates" in source
 
 
+
+
+# ---- B1 evaluator provenance (schema "2") -------------------------------------------------------
+
+def _evaluator_record():
+    from apex_investor.evaluator_identity import compute_closure_sha256, environment_identity
+    members = {"src/apex_investor/model_gate.py": "a" * 64, "src/apex_investor/citation.py": "b" * 64}
+    return {"closure_sha256": compute_closure_sha256(members), "members": members,
+            "environment": environment_identity(), "data_artifacts": {"prompt_sha256": None}}
+
+
+def test_schema_2_artifact_with_evaluator_is_accepted(tmp_path):
+    path, run_id, _ = _real_artifact(tmp_path, evaluator=_evaluator_record())
+    art = json.loads(path.read_text())
+    assert art["schema_version"] == "2"
+    sel = load_selection(path, pinned_run_id=run_id)
+    assert sel.candidate_id == "cand-a"
+
+
+def test_schema_1_artifact_without_evaluator_still_accepted(tmp_path):
+    # Backward compatibility: a schema "1" artifact carries no evaluator record and still loads.
+    path, run_id, _ = _real_artifact(tmp_path)
+    art = json.loads(path.read_text())
+    assert art["schema_version"] == "1"
+    assert art["evaluator"] is None
+    assert load_selection(path, pinned_run_id=run_id).candidate_id == "cand-a"
+
+
+def test_schema_2_artifact_missing_evaluator_is_refused(tmp_path):
+    path, run_id, _ = _real_artifact(tmp_path, evaluator=_evaluator_record())
+    art = json.loads(path.read_text())
+    art["evaluator"] = None
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps(art))
+    with pytest.raises(M3ConsumerError, match="evaluator provenance"):
+        load_selection(bad, pinned_run_id=run_id)
+
+
+def test_schema_2_artifact_with_bad_closure_hash_is_refused(tmp_path):
+    path, run_id, _ = _real_artifact(tmp_path, evaluator=_evaluator_record())
+    art = json.loads(path.read_text())
+    art["evaluator"]["closure_sha256"] = "0" * 64  # does not match the members
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps(art))
+    with pytest.raises(M3ConsumerError, match="closure_sha256"):
+        load_selection(bad, pinned_run_id=run_id)
+
+
+def test_schema_2_artifact_with_incomplete_environment_is_refused(tmp_path):
+    path, run_id, _ = _real_artifact(tmp_path, evaluator=_evaluator_record())
+    art = json.loads(path.read_text())
+    art["evaluator"]["environment"].pop("architecture")
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps(art))
+    with pytest.raises(M3ConsumerError, match="environment identity"):
+        load_selection(bad, pinned_run_id=run_id)

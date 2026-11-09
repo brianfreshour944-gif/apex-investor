@@ -1,0 +1,8 @@
+{
+ "schema_version": "1",
+ "heldout_fixture_version": "g2-pilot-2-heldout",
+ "heldout_fixture_sha256": "cf38600c5907f9b0ac982a53e106a9d14dbc6ec47f0e8101979d9cdb843d420f",
+ "path": "data/model_gate/g2_corpus.heldout.json",
+ "repinned_at": "2026-11-09",
+ "note": "Re-pinned for renderer v2 (question channel). Supersedes the pre-v2 pin. Source-controlled copy: only the 'path' reference was repointed from the draft-local 'corpus.heldout.g2.draft.json' to the source-controlled 'data/model_gate/g2_corpus.heldout.json'; all other fields are byte-identical to the approved draft."
+}

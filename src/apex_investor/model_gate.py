@@ -32,7 +32,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .citation import Citation, ProposedFinding, evaluate
+from .citation import Citation, ProposedFinding, _content_terms, evaluate
 from .docstore import DocumentStore
 
 # ---- paths --------------------------------------------------------------------------------------
@@ -40,6 +40,8 @@ from .docstore import DocumentStore
 DEFAULT_LEXICON_PATH = Path("data/model_gate/lexicon.v1.json")
 DEFAULT_DETECTOR_SPEC_PATH = Path("data/model_gate/detector_spec.v1.json")
 DEFAULT_ARTIFACT_DIR = Path("reports/m3a")
+# The source-controlled annotation authority; its raw-file SHA-256 is recorded as artifact provenance.
+DEFAULT_ANNOTATION_AUTHORITY_PATH = Path("data/model_gate/g2_annotations.json")
 
 BASELINE_ID = "abstain-always"
 
@@ -575,8 +577,10 @@ class RunVerdict:
         return self.must_answer_success / self.must_answer_total if self.must_answer_total else 0.0
 
     @property
-    def abstention_accuracy(self) -> float:
-        return self.must_abstain_success / self.must_abstain_total if self.must_abstain_total else 0.0
+    def abstention_accuracy(self) -> float | None:
+        if self.must_abstain_total == 0:
+            return None  # no abstention cases -> not applicable (not a failure)
+        return self.must_abstain_success / self.must_abstain_total
 
     @property
     def citation_support_rate(self) -> float | None:
@@ -654,6 +658,123 @@ def _normalized_contains(haystack: str, needle: str) -> bool:
     return _WS_RE.sub(" ", needle.strip().lower()) in _WS_RE.sub(" ", haystack.strip().lower())
 
 
+# ---- G2 answer validation (measure + period + value) --------------------------------------------
+#
+# The M4 gate (citation.evaluate) is LEXICAL: it keeps a finding when the claim's content terms are
+# grounded in the cited quote, but it never checks the claim's NUMBER against the authoritative
+# reference value, nor that the cited evidence is the requested measure for the requested period. On
+# the G2 financial corpus that is insufficient: a segment subtotal or a prior-year column can share
+# the row's wording and pass, awarding correctness without establishing the requested measure/period.
+#
+# The checks below close that gap for G2 answerable scenarios. They are deterministic and lexical
+# (no semantics, no tolerance), and FAIL CLOSED: if the required expectations metadata is missing, or
+# any of the three conditions cannot be established, the finding is dropped and does not count as
+# support (so the scenario scores incorrect). Abstention scenarios and legacy/synthetic fixtures
+# (whose expectations carry no `reference_value`) are unaffected.
+
+_NUMBER_RE = re.compile(r"[+-]?\(?\s*\d[\d,]*\s*\)?")
+
+
+def _integer_values(text: str) -> set[int]:
+    """Every integer-valued number in `text`, after harmless formatting normalization.
+
+    Comma grouping, surrounding whitespace, a leading `+`, and accounting parentheses are accepted;
+    parentheses and a leading `-` denote a negative. This is integer extraction only — no rounding,
+    no decimal scaling — so `478,834`, `+478834`, and `478834` are the same value, and `(8,162)` and
+    `-8162` are the same value. `478834.0` normalizes to `478834`; `478834.5` yields `478834` and
+    `5`, neither equal to `478834`, so it is not a match.
+    """
+    values: set[int] = set()
+    for match in _NUMBER_RE.finditer(text or ""):
+        token = match.group(0)
+        negative = token.lstrip().startswith(("(", "-"))
+        digits = re.sub(r"\D", "", token)
+        if not digits:
+            continue
+        value = int(digits)
+        values.add(-value if negative else value)
+    return values
+
+
+def _g2_measure_terms(expectations: dict) -> frozenset[str]:
+    """Content terms that name the requested MEASURE, derived deterministically from the metadata.
+
+    Primary source: the `evidence_description`'s "<row> row" clause (e.g. "Total net sales row"),
+    intersected with the `measure_definition` terms to keep only measure-bearing words. Falls back to
+    the raw row terms, then to the measure_definition terms, so a scenario without a parseable row
+    clause is still checked as strictly as the metadata allows.
+    """
+    measure_definition = expectations.get("measure_definition") or ""
+    evidence_description = expectations.get("evidence_description") or ""
+    row_match = re.search(r"[;:]\s*(?P<row>.+?)\s+row\b", evidence_description, re.IGNORECASE)
+    row_terms = _content_terms(row_match.group("row")) if row_match else frozenset()
+    measure_terms = _content_terms(measure_definition)
+    intersection = frozenset(row_terms & measure_terms)
+    if intersection:
+        return intersection
+    if row_terms:
+        return frozenset(row_terms)
+    return frozenset(measure_terms & _content_terms(evidence_description))
+
+
+def _g2_period_tokens(expectations: dict) -> set[str]:
+    """4-digit year tokens that name the requested REPORTING PERIOD.
+
+    Prefers the years in `evidence_description` (the exact table/column the evidence is anchored to),
+    falling back to `measure_definition`. If neither carries a year, the period check is skipped and
+    the measure/value checks still apply.
+    """
+    for source in (expectations.get("evidence_description") or "",
+                   expectations.get("measure_definition") or ""):
+        years = set(re.findall(r"\b(\d{4})\b", source))
+        if years:
+            return years
+    return set()
+
+
+def _g2_answer_supported(expectations: dict, claim: str, quotes: tuple[str, ...],
+                         cited_texts: tuple[str, ...]) -> tuple[bool, str]:
+    """Do the claim and its cited evidence establish the requested measure, period, and value?
+
+    All three must hold; otherwise `(False, reason)`. `quotes` are the verbatim quote spans of the
+    citations M4 kept; `cited_texts` are the full texts of the documents those citations point at.
+    A `None` reference value (or an abstain scenario) means there is nothing to validate.
+    """
+    reference_value = expectations.get("reference_value")
+    if reference_value is None:
+        return True, "no reference value to validate"
+    if isinstance(reference_value, bool) or not isinstance(reference_value, int):
+        # Fail closed: a non-integer reference cannot be validated against the claim.
+        return False, f"reference value is not an integer: {reference_value!r}"
+
+    evidence_text = " ".join(quotes)
+
+    # (1) value: the claim states the expected value, and the cited evidence carries it.
+    if reference_value not in _integer_values(claim):
+        return False, f"claim does not state the expected value {reference_value}"
+    if reference_value not in _integer_values(evidence_text):
+        return False, f"cited evidence does not contain the expected value {reference_value}"
+
+    # (2) measure: the cited evidence names the requested measure.
+    measure_terms = _g2_measure_terms(expectations)
+    if measure_terms:
+        missing = sorted(measure_terms - _content_terms(evidence_text))
+        if missing:
+            return False, f"cited evidence does not establish the requested measure (missing {missing})"
+
+    # (3) period: the requested reporting period is supported by the cited evidence. The period is
+    # named in the metadata's year token; the cited document (the filing for the requested period)
+    # or the claim or the quote must carry it. A different-period value is already rejected by the
+    # value check, which is the operative guard for single-document scenarios.
+    period_tokens = _g2_period_tokens(expectations)
+    if period_tokens:
+        haystack = " ".join((claim, evidence_text, *cited_texts))
+        if not any(year in haystack for year in period_tokens):
+            return False, f"cited evidence does not establish the reporting period {sorted(period_tokens)}"
+
+    return True, "measure, period, and value established"
+
+
 def score_scenario(scenario: dict, store: DocumentStore, run_entry: dict | None, *,
                    model: str, prompt_version: str, spec: dict) -> ScenarioResult:
     must_abstain = bool(scenario["expectations"].get("must_abstain"))
@@ -682,11 +803,26 @@ def score_scenario(scenario: dict, store: DocumentStore, run_entry: dict | None,
             res.forbidden_recommendations += 1
         result = evaluate(f, store)
         if result.kept:
-            res.supported += 1
-            # Only citations that PASSED M4 (carried in the verified finding's evidence) count toward
-            # required-document compliance for THIS finding. A citation's mere presence in the model
-            # response is not proof it survived verification.
-            verified_by_finding.append({e.citation.doc_id for e in result.finding.evidence})
+            quotes = tuple(e.citation.quote_span for e in result.finding.evidence)
+            cited_texts = tuple(
+                doc.text if (doc := store.get(e.citation.doc_id)) else ""
+                for e in result.finding.evidence
+            )
+            answer_ok, _answer_reason = _g2_answer_supported(
+                scenario["expectations"], f.claim, quotes, cited_texts)
+            if not answer_ok:
+                # M4 kept the finding, but it does not establish the requested measure/period/value
+                # (e.g. a segment subtotal or a prior-year column). Drop it so it does not count as
+                # support; the scenario then scores incorrect. Fail closed: never award correctness
+                # on a numeric match alone.
+                res.unsupported += 1
+                verified_by_finding.append(set())
+            else:
+                res.supported += 1
+                # Only citations that PASSED M4 (carried in the verified finding's evidence) count
+                # toward required-document compliance for THIS finding. A citation's mere presence in
+                # the model response is not proof it survived verification.
+                verified_by_finding.append({e.citation.doc_id for e in result.finding.evidence})
         else:
             verified_by_finding.append(set())
             category, _reason = _classify_drop(result)
@@ -822,7 +958,8 @@ def eligibility_failures(verdict: RunVerdict, thresholds: Thresholds) -> list[st
         problems.append("scenario accuracy below the minimum")
     if verdict.completeness_rate < thresholds.min_completeness:
         problems.append("completeness below the minimum")
-    if verdict.abstention_accuracy < thresholds.min_abstention:
+    abstention = verdict.abstention_accuracy
+    if abstention is not None and abstention < thresholds.min_abstention:
         problems.append("abstention accuracy below the minimum")
     support = verdict.citation_support_rate
     if support is None:
@@ -1102,9 +1239,35 @@ def probe_differs_from_finding(findings: list[ProposedFinding], store: DocumentS
 def build_artifact(*, run_id: str, recorded_at: str, freeze: dict, fixtures: dict,
                    prompt_version: str, detector_spec: dict, detector_spec_sha256: str,
                    thresholds: Thresholds, candidate_entries: list[dict],
-                   selection: Selection, known_limitations: dict) -> dict:
+                   selection: Selection, known_limitations: dict,
+                   evaluator: dict | None = None) -> dict:
+    """Build the versioned selection artifact.
+
+    ``evaluator`` (schema "2") is the VERIFIED evaluator identity from the freeze authorization --
+    closure hash, member hashes, environment, and the pinned data-artifact identities. It is written
+    at the original exclusive write and never backfilled. When absent, schema stays "1".
+    """
+    if evaluator is None:
+        schema_version = "1"
+    else:
+        schema_version = "2"
+        evaluator = {
+            "closure_sha256": evaluator["closure_sha256"],
+            "members": evaluator["members"],
+            "environment": evaluator["environment"],
+            "data_artifacts": {
+                # The actual executed prompt hash is not yet available through this pipeline; the
+                # field is kept explicit and null rather than substituting a version token as proof.
+                "prompt_sha256": None,
+                "annotation_authority_sha256": evaluator.get("annotation_authority_sha256"),
+                "detector_spec_sha256": detector_spec_sha256,
+                "directive_lexicon_sha256": canonical_sha256(detector_spec["lexicon"]),
+                "dev_corpus_sha256": fixtures["dev"]["sha256"],
+                "heldout_corpus_sha256": fixtures["heldout"]["sha256"],
+            },
+        }
     return {
-        "schema_version": "1",
+        "schema_version": schema_version,
         "recorded_at": recorded_at,
         "run_id": run_id,
         "freeze": freeze,
@@ -1126,6 +1289,7 @@ def build_artifact(*, run_id: str, recorded_at: str, freeze: dict, fixtures: dic
             "prompt_version": selection.prompt_version, "reason": selection.reason,
         },
         "known_limitations": known_limitations,
+        "evaluator": evaluator,
     }
 
 
