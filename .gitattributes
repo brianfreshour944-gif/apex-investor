@@ -1,0 +1,3 @@
+# Pin the approved G2 prompt artifact to LF so a checkout on a platform with autocrlf=true cannot
+# rewrite its bytes and break the approved SHA-256. Scoped to this one file; no other paths affected.
+src/apex_investor/prompts/g2_system_prompt.txt text eol=lf
