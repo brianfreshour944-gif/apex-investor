@@ -1,8 +1,8 @@
 {
- "annotation_version": "g2-pilot-draft-2",
+ "annotation_version": "g2-pilot-draft-3",
  "pilot": "G2 six-scenario pilot",
  "as_of": "2026-11-09T00:24:40Z",
- "note": "Reference values are operator annotations; not machine-scored. Values below were checked against the captured filing bytes by the agent. Treat as verified-against-filing, not yet approved as ground truth.",
+ "note": "Operator-approved G2 reference annotations. Approved 2026-11-09 (all six scenarios, including the HOLD-03 abstention); revised 2026-11-09 under adjudication A: HOLD-02's measure_definition source description is corrected to the Segment Operating Performance table, and a source-location 'evidence_description' field is added to every scenario. Reference values and the documents[] capture pins (including AAPL-FY2026 capture_sha256 f4609015\u2026) are UNCHANGED. See finding F-7: the AAPL-FY2026 original capture is not reproducible from the current source response and is preserved as an open provenance exception.",
  "documents": [
   {
    "sym": "MSFT-FY2025",
@@ -82,7 +82,8 @@
    "human_verification": "verified-against-filing",
    "verified_by": "agent",
    "verified_at": "2026-11-08",
-   "notes": "Filing row: Revenue $281,724 (FY2024 $245,122)."
+   "notes": "Filing row: Revenue $281,724 (FY2024 $245,122).",
+   "evidence_description": "MD&A \u2014 Summary Results of Operations; Revenue row, 2025 column"
   },
   {
    "scenario_id": "DEV-02",
@@ -95,7 +96,8 @@
    "human_verification": "verified-against-filing",
    "verified_by": "agent",
    "verified_at": "2026-11-08",
-   "notes": "Filing row: Net income $112,010 (FY2024 $93,736)."
+   "notes": "Filing row: Net income $112,010 (FY2024 $93,736).",
+   "evidence_description": "Consolidated Statements of Operations; Net income row, 2025 column"
   },
   {
    "scenario_id": "DEV-03",
@@ -108,7 +110,8 @@
    "human_verification": "verified-against-filing",
    "verified_by": "agent",
    "verified_at": "2026-11-08",
-   "notes": "Consolidated net loss $(8,162). Parent-attributable $(8,182). Adjusted EBIT $6,780 (non-GAAP)."
+   "notes": "Consolidated net loss $(8,162). Parent-attributable $(8,182). Adjusted EBIT $6,780 (non-GAAP).",
+   "evidence_description": "Net Income/(Loss) Reconciliation to Adjusted EBIT; Net income/(loss) row, 2025 column"
   },
   {
    "scenario_id": "HOLD-01",
@@ -121,20 +124,22 @@
    "human_verification": "verified-against-filing",
    "verified_by": "agent",
    "verified_at": "2026-11-08",
-   "notes": "Filing row: Net income 133,749 (FY2025 101,832). Adjusted net income 128,786 is non-GAAP."
+   "notes": "Filing row: Net income 133,749 (FY2025 101,832). Adjusted net income 128,786 is non-GAAP.",
+   "evidence_description": "MD&A \u2014 Summary Results of Operations; Net income row, 2026 column"
   },
   {
    "scenario_id": "HOLD-02",
    "document_sym": "AAPL-FY2026",
    "expected_behavior": "answer",
    "measure": "total net sales",
-   "measure_definition": "GAAP total net sales for the fiscal year, consolidated statement of operations",
+   "measure_definition": "GAAP total net sales for the fiscal year, segment operating performance (reportable segment total)",
    "reference_value": 478834,
    "reference_unit": "USD millions",
    "human_verification": "verified-against-filing",
    "verified_by": "agent",
    "verified_at": "2026-11-08",
-   "notes": "Filing row: Total net sales 478,834 (FY2025 416,161)."
+   "notes": "Filing row: Total net sales 478,834 (FY2025 416,161).",
+   "evidence_description": "Segment Operating Performance; Total net sales row, 2026 column"
   },
   {
    "scenario_id": "HOLD-03",
@@ -146,7 +151,8 @@
    "human_verification": "verified-against-filing",
    "verified_by": "agent",
    "verified_at": "2026-11-08",
-   "notes": "FY2026 10-K covers the year ended 2026-06-30 and does not establish FY2027 Q1. Abstain because the supplied filing does not establish it, not because it is unavailable generally."
+   "notes": "FY2026 10-K covers the year ended 2026-06-30 and does not establish FY2027 Q1. Abstain because the supplied filing does not establish it, not because it is unavailable generally.",
+   "evidence_description": "Not established by the supplied FY2026 10-K; abstention expected"
   }
  ],
  "capture_time_note": "Capture window 2026-11-09T00:24:40Z..00:24:45Z (file mtimes, UTC). Confirmed by SEC HTTP Date header 2026-11-09T00:31:32Z. Machine TZ = UTC (no /etc/timezone, TZ unset). No HTTP headers were saved at capture; Date re-confirmed via HEAD after the fact."

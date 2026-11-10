@@ -1,14 +1,19 @@
 {
  "record_type": "g2-annotation-approval",
- "record_version": "1",
+ "record_version": "2",
  "created_at": "2026-11-09",
  "approved_by": "operator",
  "approved_by_role": "operator (explicit written authorization)",
  "approved_at": "2026-11-09",
- "method": "additive; frozen authority unchanged",
+ "method": "operator-approved revision; additive source-location field (evidence_description) on all six scenarios plus the HOLD-02 source-description correction under adjudication A; reference values and documents[] capture pins unchanged",
  "authoritative_source": "data/model_gate/g2_annotations.json",
- "approved_authority_raw_sha256": "0bc0257b90ad2431ad34db2fdd12d697973e62db619363d9a0aad6f80b224c99",
- "source_frozen_sha256": "0bc0257b90ad2431ad34db2fdd12d697973e62db619363d9a0aad6f80b224c99",
+ "approved_authority_raw_sha256": "3495633a12497a583517e39f06d4df7df6b6ed71d5a1ccfbaf2c8e0157f25016",
+ "source_frozen_sha256": "3495633a12497a583517e39f06d4df7df6b6ed71d5a1ccfbaf2c8e0157f25016",
+ "supersedes": {
+  "approved_authority_raw_sha256": "0bc0257b90ad2431ad34db2fdd12d697973e62db619363d9a0aad6f80b224c99",
+  "approved_at": "2026-11-09",
+  "note": "original G2 pilot approval (annotation_version g2-pilot-draft-2)"
+ },
  "scope": {
   "description": "all six reference annotations, including the HOLD-03 abstention",
   "scenario_ids": [
@@ -22,8 +27,7 @@
   "includes_abstention": true
  },
  "provenance": {
-  "approval_event_artifact": "/tmp/apex_g2_contract_draft/annotations.operator-approved.draft.json",
-  "approval_event_artifact_sha256": "cdfcb571386f34aa0001493ddf586c3f77fc7ed766a466ea29d276f22094ae08",
-  "note": "Lean reference record. The operator approval event is recorded in the draft artifact above; this record binds that approval to the source-controlled authority by hash. Reference values are NOT duplicated here: the annotation authority (data/model_gate/g2_annotations.json) remains the single source of truth. The frozen snapshot frozen_g2_evidence/packages/_annotations.json is unchanged. No personal approver name exists in the approval evidence; the approver is recorded as the role 'operator'."
+  "note": "Revised approval bound to the current authority by raw SHA-256. The operator authorized the authority-file change and this new approval event in-session (G2-C2c). Reference values are NOT duplicated here: data/model_gate/g2_annotations.json remains the single source of truth. The AAPL-FY2026 original capture hash (f4609015\u2026) is preserved unchanged and remains an open provenance exception (finding F-7).",
+  "superseded_authority_sha256": "0bc0257b90ad2431ad34db2fdd12d697973e62db619363d9a0aad6f80b224c99"
  }
 }

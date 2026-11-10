@@ -111,6 +111,21 @@ def test_g2_gate_refuses_on_reference_value_drift(tmp_path):
     assert _artifacts(tmp_path) == []
 
 
+def test_g2_gate_refuses_on_dev_manifest_mismatch(tmp_path, monkeypatch):
+    # The gate verifies each corpus against its source-controlled manifest pin. Point the DEV manifest
+    # at a pin that does not match the DEV corpus -> refuse before any scoring.
+    bad_manifest = tmp_path / "g2.dev.manifest.json"
+    bad_manifest.write_text(json.dumps({
+        "schema_version": "1", "fixture_sha256": "0" * 64,
+        "path": "data/model_gate/g2_corpus.dev.json"}))
+    heldout_manifest = ROOT / "data" / "model_gate" / "g2_heldout_manifest.json"
+    monkeypatch.setattr(corpus_consistency, "default_manifest_paths",
+                        lambda: (bad_manifest, heldout_manifest))
+    rc = CLI.main(_g2_setup(tmp_path))
+    assert rc == 2
+    assert _artifacts(tmp_path) == []
+
+
 def test_g2_gate_refuses_on_abstain_value(tmp_path):
     heldout = json.loads(G2_HELDOUT.read_text())
     for s in heldout["scenarios"]:

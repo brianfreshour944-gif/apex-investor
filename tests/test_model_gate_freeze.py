@@ -107,7 +107,7 @@ def test_frozen_run_writes_schema_2_artifact_with_provenance(tmp_path):
     assert ev["closure_sha256"] == json.loads(
         (ROOT / "data/model_gate/evaluator_closure.v1.json").read_text())["closure_sha256"]
     assert ev["data_artifacts"]["annotation_authority_sha256"] == \
-        "0bc0257b90ad2431ad34db2fdd12d697973e62db619363d9a0aad6f80b224c99"
+        "3495633a12497a583517e39f06d4df7df6b6ed71d5a1ccfbaf2c8e0157f25016"
     assert ev["data_artifacts"]["prompt_sha256"] is None
 
 

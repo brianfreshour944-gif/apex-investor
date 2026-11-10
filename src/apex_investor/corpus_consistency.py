@@ -25,19 +25,40 @@ Fail-closed conditions (each raises `CorpusConsistencyError`):
   - an answerable scenario is missing `reference_value`, or it is non-numeric, or it differs from the
     authoritative annotation;
   - an abstain scenario carries a non-null `reference_value` (HOLD-03 must remain null);
+  - an answerable scenario's scored `measure_definition` does not represent the authority's declared
+    `measure` (R1′ measure-name identity);
+  - an answerable scenario's scored `evidence_description` does not match the authority's declared
+    source location (source-location identity), including the case where the measure name matches but
+    the source location differs (the HOLD-02 / F-1 class);
   - the approval record is missing, unreadable, not JSON, or its raw SHA-256 does not match its pin;
   - the approval record's `approved_authority_raw_sha256` or `source_frozen_sha256` does not match the
     pinned authority, or does not match the authority file actually in force;
-  - the approval record's scope does not cover every required scenario id (incl. HOLD-03).
+  - the approval record's scope does not cover every required scenario id (incl. HOLD-03);
+  - the source-controlled DEV corpus does not match its manifest's canonical hash.
 
 Limitation: this proves the two copies AGREE at check time. It does not make the corpus the authority;
 if they ever disagree, the annotation wins and the check refuses the corpus.
+
+The measure-name and source-location checks run only when the authority DECLARES the corresponding
+field (`measure` / `evidence_description`). The genuine G2 authority declares both for every answerable
+scenario; legacy/synthetic annotations that omit them are not subject to the check. A declared field
+that the corpus cannot satisfy is a problem (fail closed). The source-location check compares the
+authority's location against the scored description's LOCATION CLAUSE (the first sentence): a scored
+description may carry an explanatory tail that NAMES another table (HOLD-02 negates the consolidated
+statement), so comparing against the full text would let a wrong authority location pass.
+
+R1′ (the measure-name check) is NOT sufficient on its own: it compares the short measure NAME, which
+for HOLD-02 matches even though the source location differs. The source-location check is what catches
+that class; the two checks are complementary and both are required.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 from pathlib import Path
+
+from .citation import _content_terms
+from .model_gate import canonical_sha256
 
 # The single, source-controlled authority: a byte-exact copy of the frozen operator annotations.
 DEFAULT_ANNOTATIONS_PATH = Path("data/model_gate/g2_annotations.json")
@@ -46,14 +67,22 @@ DEFAULT_ANNOTATIONS_PATH = Path("data/model_gate/g2_annotations.json")
 DEFAULT_DEV_CORPUS_PATH = Path("data/model_gate/g2_corpus.dev.json")
 DEFAULT_HELDOUT_CORPUS_PATH = Path("data/model_gate/g2_corpus.heldout.json")
 
+# Source-controlled manifests that pin each corpus's canonical hash. The held-out manifest predates
+# this module; the DEV manifest (added G2-C2c) closes the provenance gap between the two halves. Both
+# are verified the same way so DEV and held-out provenance are independently verifiable.
+DEFAULT_DEV_MANIFEST_PATH = Path("data/model_gate/g2_dev_manifest.json")
+DEFAULT_HELDOUT_MANIFEST_PATH = Path("data/model_gate/g2_heldout_manifest.json")
+
 # Genuine G2 scenarios carry a dedicated `question` field (renderer v2); synthetic/test-only fixtures
 # carry the legacy `instruction` field. This marker distinguishes the two paths.
 G2_SCENARIO_MARKER = "question"
 
 # Raw-file SHA-256 of the source-controlled authority. Pinning the raw bytes (not a canonical
 # re-serialization) means any byte change to the authority is detected.
+# g2-pilot-draft-3 (2026-11-09): operator-approved revision adding `evidence_description` to every
+# scenario and correcting HOLD-02's source description under adjudication A. Supersedes 0bc0257b….
 AUTHORITATIVE_ANNOTATIONS_SHA256 = (
-    "0bc0257b90ad2431ad34db2fdd12d697973e62db619363d9a0aad6f80b224c99"
+    "3495633a12497a583517e39f06d4df7df6b6ed71d5a1ccfbaf2c8e0157f25016"
 )
 
 # The separate, source-controlled OPERATOR-APPROVAL record. Option (b): the authority stays a
@@ -65,7 +94,7 @@ DEFAULT_APPROVAL_PATH = Path("data/model_gate/g2_annotation_approval.json")
 # Raw-file SHA-256 of the approval record. Pinned so the approval's own bytes are frozen too: a change
 # to the approval record (or its disappearance) is detected.
 APPROVAL_RECORD_SHA256 = (
-    "0bd5bc1e716dd10592709c624ccbf2f3d48230429861037b88244ab8d693ac76"
+    "808f551febc25d1c16d63a34ecf9b81533a737a82c80dbbb4e7d35b5ce6999e3"
 )
 
 # The approval scope must cover every reference scenario, including the HOLD-03 abstention.
@@ -91,6 +120,11 @@ def _repo_path(rel: Path) -> Path:
 def default_corpus_paths() -> tuple[Path, Path]:
     """Absolute paths to the source-controlled DEV and held-out G2 corpora."""
     return _repo_path(DEFAULT_DEV_CORPUS_PATH), _repo_path(DEFAULT_HELDOUT_CORPUS_PATH)
+
+
+def default_manifest_paths() -> tuple[Path, Path]:
+    """Absolute paths to the source-controlled DEV and held-out corpus manifests."""
+    return _repo_path(DEFAULT_DEV_MANIFEST_PATH), _repo_path(DEFAULT_HELDOUT_MANIFEST_PATH)
 
 
 def default_approval_path() -> Path:
@@ -182,16 +216,62 @@ def load_default_authoritative_annotations() -> dict:
     return load_authoritative_annotations(default_annotations_path())
 
 
+def verify_corpus_manifest(corpus: dict, manifest: dict, *, label: str) -> list[str]:
+    """Return a sorted list of manifest problems (empty means the corpus matches its manifest).
+
+    A corpus manifest pins the corpus's canonical hash (`canonical_sha256`, the same convention the
+    held-out path already uses). This proves the corpus bytes actually checked are the ones pinned.
+    """
+    problems: list[str] = []
+    if not isinstance(manifest, dict):
+        return [f"{label}: manifest must be a JSON object"]
+    path = manifest.get("path")
+    if not isinstance(path, str) or not path:
+        problems.append(f"{label}: manifest has no 'path'")
+    expected = manifest.get("fixture_sha256") or manifest.get("heldout_fixture_sha256")
+    if not isinstance(expected, str) or not expected:
+        problems.append(f"{label}: manifest has no fixture sha256")
+        return sorted(problems)
+    actual = canonical_sha256(corpus)
+    if actual != expected:
+        problems.append(f"{label}: corpus canonical hash {actual} != manifest {expected}")
+    return sorted(problems)
+
+
 def assert_default_corpora_consistent() -> None:
     """Verify the source-controlled DEV+HOLD corpora against the source-controlled authority.
 
     Uses only repository artifacts, so it is reproducible from a clean checkout. Fail closed. Also
-    verifies the source-controlled operator-approval record binds to the authority.
+    verifies the source-controlled operator-approval record binds to the authority, and that each
+    corpus matches its source-controlled manifest pin (DEV and held-out provenance independently
+    verifiable).
     """
     dev_path, heldout_path = default_corpus_paths()
     corpora = [_read_json(dev_path, "dev corpus"), _read_json(heldout_path, "held-out corpus")]
     assert_corpora_consistent_with_annotation_file(corpora, default_annotations_path())
     assert_default_approval_valid()
+    assert_default_manifests_valid(corpora)
+
+
+def assert_default_manifests_valid(corpora: list[dict] | None = None) -> None:
+    """Verify each source-controlled corpus against its manifest pin. Fail closed.
+
+    `corpora` may be supplied (already-loaded DEV, held-out order) to avoid re-reading; when omitted
+    the corpora are read from disk.
+    """
+    dev_manifest_path, heldout_manifest_path = default_manifest_paths()
+    if corpora is None:
+        dev_path, heldout_path = default_corpus_paths()
+        corpora = [_read_json(dev_path, "dev corpus"), _read_json(heldout_path, "held-out corpus")]
+    dev_corpus, heldout_corpus = corpora
+    problems = verify_corpus_manifest(dev_corpus, _read_json(dev_manifest_path, "dev manifest"),
+                                      label="dev")
+    problems += verify_corpus_manifest(heldout_corpus,
+                                       _read_json(heldout_manifest_path, "held-out manifest"),
+                                       label="held-out")
+    if problems:
+        raise CorpusConsistencyError(
+            "corpus manifest check failed:\n  " + "\n  ".join(sorted(problems)))
 
 
 def assert_default_approval_valid() -> dict:
@@ -230,7 +310,8 @@ def assert_genuine_g2_corpora_consistent(dev_corpus: dict, heldout_corpus: dict,
     Called by the evaluation CLI before any candidate is scored. `annotations_path` defaults to the
     source-controlled authority; pass an explicit path only for tests. Requires the authority's raw
     SHA-256 to match the pin (a missing or altered authority is refused). When the default authority is
-    used, the source-controlled operator-approval record is verified as well (both artifacts).
+    used, the source-controlled operator-approval record is verified as well (both artifacts), and each
+    corpus is verified against its source-controlled manifest pin (DEV and held-out).
     """
     if annotations_path is None:
         path = default_annotations_path()
@@ -238,6 +319,8 @@ def assert_genuine_g2_corpora_consistent(dev_corpus: dict, heldout_corpus: dict,
     else:
         path = annotations_path
     assert_corpora_consistent_with_annotation_file([dev_corpus, heldout_corpus], path)
+    if annotations_path is None:
+        assert_default_manifests_valid([dev_corpus, heldout_corpus])
 
 
 def _read_json(path: Path, label: str) -> dict:
@@ -291,6 +374,18 @@ def _is_int_like(value: object) -> bool:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
     return not isinstance(value, float) or value.is_integer()
+
+
+def _location_clause(evidence_description: object) -> str:
+    """The source-location clause of an `evidence_description`: the text up to the first sentence end.
+
+    The scored descriptions carry an explanatory tail after the location (HOLD-02's tail negates the
+    consolidated statement, HOLD-01's names a separate non-GAAP measure). The location is the first
+    sentence, so comparing only that clause avoids a wrong authority location matching a tail word.
+    """
+    if not isinstance(evidence_description, str):
+        return ""
+    return evidence_description.split(".", 1)[0].strip()
 
 
 def check_corpus_against_annotations(corpus: dict, annotations: dict, *,
@@ -352,6 +447,34 @@ def check_corpus_against_annotations(corpus: dict, annotations: dict, *,
         if int(ref) != int(authoritative):
             problems.append(
                 f"{sid}: reference_value {int(ref)} != authoritative annotation {int(authoritative)}")
+
+        # R1' measure-name identity: when the authority declares a `measure`, its content terms must be
+        # represented in the scored `measure_definition`. This protects the measure NAME only; it is not
+        # a source-location check and (verified) passes the HOLD-02 / F-1 case on its own.
+        authority_measure = entry.get("measure")
+        if isinstance(authority_measure, str) and authority_measure.strip():
+            declared = _content_terms(authority_measure)
+            scored_def = _content_terms(expectations.get("measure_definition") or "")
+            missing = sorted(declared - scored_def)
+            if missing:
+                problems.append(
+                    f"{sid}: scored measure_definition does not represent the authority's measure "
+                    f"{authority_measure!r} (missing {missing})")
+
+        # Source-location identity: when the authority declares an `evidence_description`, its location
+        # clause must be represented in the scored `evidence_description`'s location clause. This is the
+        # check that catches the F-1 class: a matching measure name with the wrong source location
+        # fails. Only the location clause (first sentence) is compared, so a scored explanatory tail
+        # that names another table cannot rescue a wrong authority location.
+        authority_location = entry.get("evidence_description")
+        if isinstance(authority_location, str) and authority_location.strip():
+            declared_loc = _content_terms(_location_clause(authority_location))
+            scored_loc = _content_terms(_location_clause(expectations.get("evidence_description")))
+            missing_loc = sorted(declared_loc - scored_loc)
+            if missing_loc:
+                problems.append(
+                    f"{sid}: scored evidence_description does not match the authority's source location "
+                    f"{authority_location!r} (missing {missing_loc})")
 
     if require_full_coverage:
         for sid in ann:

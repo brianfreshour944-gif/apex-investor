@@ -16,6 +16,7 @@ from apex_investor.corpus_consistency import (
     AUTHORITATIVE_ANNOTATIONS_SHA256,
     DEFAULT_ANNOTATIONS_PATH,
     DEFAULT_APPROVAL_PATH,
+    DEFAULT_DEV_MANIFEST_PATH,
     REQUIRED_SCOPE_SCENARIO_IDS,
     CorpusConsistencyError,
     assert_approval_record_valid,
@@ -24,15 +25,19 @@ from apex_investor.corpus_consistency import (
     assert_corpus_consistent_with_annotations,
     assert_default_approval_valid,
     assert_default_corpora_consistent,
+    assert_default_manifests_valid,
     check_approval_record,
     check_corpus_against_annotations,
     default_annotations_path,
     default_approval_path,
     default_corpus_paths,
+    default_manifest_paths,
     load_approval_record,
     load_authoritative_annotations,
     load_default_authoritative_annotations,
+    verify_corpus_manifest,
 )
+from apex_investor.model_gate import canonical_sha256
 
 EXPECTED_SCENARIO_IDS = {"DEV-01", "DEV-02", "DEV-03", "HOLD-01", "HOLD-02", "HOLD-03"}
 
@@ -43,18 +48,27 @@ def corpus(scenarios):
     return {"fixture_version": "t", "corpus": "t", "scenarios": scenarios}
 
 
-def scen(sid, must_abstain, reference_value=None):
+def scen(sid, must_abstain, reference_value=None, measure_definition=None, evidence_description=None):
+    expectations = {"must_abstain": must_abstain, "reference_value": reference_value}
+    if measure_definition is not None:
+        expectations["measure_definition"] = measure_definition
+    if evidence_description is not None:
+        expectations["evidence_description"] = evidence_description
     return {"id": sid, "ticker": "X", "as_of": "2026-11-09", "question": "q",
-            "documents": [], "expectations": {"must_abstain": must_abstain,
-                                              "reference_value": reference_value}}
+            "documents": [], "expectations": expectations}
 
 
 def annot(scenarios):
     return {"annotation_version": "t", "scenarios": scenarios}
 
 
-def ascen(sid, behavior, reference_value=None):
-    return {"scenario_id": sid, "expected_behavior": behavior, "reference_value": reference_value}
+def ascen(sid, behavior, reference_value=None, measure=None, evidence_description=None):
+    entry = {"scenario_id": sid, "expected_behavior": behavior, "reference_value": reference_value}
+    if measure is not None:
+        entry["measure"] = measure
+    if evidence_description is not None:
+        entry["evidence_description"] = evidence_description
+    return entry
 
 
 # ---- happy path (pure) ----------------------------------------------------------------------------
@@ -94,6 +108,96 @@ def test_must_abstain_disagreement_flagged():
     c = corpus([scen("A", True, None)])
     a = annot([ascen("A", "answer", 100)])
     assert any("disagrees" in p for p in check_corpus_against_annotations(c, a))
+
+
+# ---- R1' measure-name identity (pure) -------------------------------------------------------------
+
+def test_measure_name_represented_passes():
+    c = corpus([scen("A", False, 100,
+                     measure_definition="GAAP total net sales for the fiscal year",
+                     evidence_description="Segment Operating Performance; Total net sales row, 2026")])
+    a = annot([ascen("A", "answer", 100, measure="total net sales",
+                     evidence_description="Segment Operating Performance; Total net sales row, 2026")])
+    assert check_corpus_against_annotations(c, a) == []
+
+
+def test_measure_name_dropped_fails():
+    c = corpus([scen("A", False, 100,
+                     measure_definition="GAAP net income for the fiscal year",
+                     evidence_description="Segment Operating Performance; Total net sales row, 2026")])
+    a = annot([ascen("A", "answer", 100, measure="total net sales",
+                     evidence_description="Segment Operating Performance; Total net sales row, 2026")])
+    problems = check_corpus_against_annotations(c, a)
+    assert any("measure_definition does not represent" in p and "sales" in p for p in problems)
+    with pytest.raises(CorpusConsistencyError):
+        assert_corpus_consistent_with_annotations(c, a)
+
+
+def test_measure_check_skipped_when_authority_omits_measure():
+    # Legacy/synthetic annotations without a `measure` are not subject to R1'.
+    c = corpus([scen("A", False, 100)])
+    a = annot([ascen("A", "answer", 100)])
+    assert check_corpus_against_annotations(c, a) == []
+
+
+def test_measure_check_skipped_for_abstain():
+    c = corpus([scen("B", True, None)])
+    a = annot([ascen("B", "abstain", None, measure="FY2027 first-quarter revenue")])
+    assert check_corpus_against_annotations(c, a) == []
+
+
+# ---- source-location identity (pure) --------------------------------------------------------------
+
+def test_source_location_mismatch_same_measure_name_fails():
+    # THE ACCEPTANCE CASE: the measure name matches, but the source location differs -> must fail.
+    c = corpus([scen("A", False, 100,
+                     measure_definition="GAAP total net sales for the fiscal year",
+                     evidence_description="Consolidated Statements of Operations; Total net sales row, 2026")])
+    a = annot([ascen("A", "answer", 100, measure="total net sales",
+                     evidence_description="Segment Operating Performance; Total net sales row, 2026")])
+    problems = check_corpus_against_annotations(c, a)
+    assert any("source location" in p for p in problems)
+    with pytest.raises(CorpusConsistencyError):
+        assert_corpus_consistent_with_annotations(c, a)
+
+
+def test_source_location_tail_naming_other_table_does_not_rescue_wrong_location():
+    # A scored description whose TAIL names the consolidated statement must not match a wrong
+    # authority location, because only the location clause (first sentence) is compared.
+    wrong_scored = ("Segment Operating Performance; Total net sales row, 2026 column. "
+                    "This is a segment-performance presentation, not the consolidated statement of operations.")
+    c = corpus([scen("A", False, 100,
+                     measure_definition="GAAP total net sales for the fiscal year",
+                     evidence_description=wrong_scored)])
+    a = annot([ascen("A", "answer", 100, measure="total net sales",
+                     evidence_description="Consolidated Statements of Operations; Total net sales row, 2026")])
+    problems = check_corpus_against_annotations(c, a)
+    assert any("source location" in p for p in problems)
+
+
+def test_source_location_correct_with_negating_tail_passes():
+    # The genuine HOLD-02 shape: location clause matches; the tail negates the consolidated statement.
+    scored = ("Segment Operating Performance; Total net sales row, 2026 column. "
+              "This is a segment-performance presentation, not the consolidated statement of operations.")
+    c = corpus([scen("A", False, 100,
+                     measure_definition="GAAP total net sales for the fiscal year, segment operating performance",
+                     evidence_description=scored)])
+    a = annot([ascen("A", "answer", 100, measure="total net sales",
+                     evidence_description="Segment Operating Performance; Total net sales row, 2026 column")])
+    assert check_corpus_against_annotations(c, a) == []
+
+
+def test_source_location_check_skipped_when_authority_omits_field():
+    c = corpus([scen("A", False, 100)])
+    a = annot([ascen("A", "answer", 100)])
+    assert check_corpus_against_annotations(c, a) == []
+
+
+def test_source_location_missing_in_corpus_fails():
+    c = corpus([scen("A", False, 100, measure_definition="GAAP total net sales for the fiscal year")])
+    a = annot([ascen("A", "answer", 100, measure="total net sales",
+                     evidence_description="Segment Operating Performance; Total net sales row, 2026")])
+    assert any("source location" in p for p in check_corpus_against_annotations(c, a))
 
 
 def test_non_numeric_reference_flagged():
@@ -225,6 +329,93 @@ def test_third_copy_guard_corpus_and_authority_agree():
         for s in json.loads(path.read_text())["scenarios"]:
             seen[s["id"]] = s["expectations"].get("reference_value")
     assert seen == authority
+
+
+# ---- real-artifact measure/location + manifest (clean checkout) ------------------------------------
+
+def test_real_authority_declares_measure_and_location_for_every_answerable():
+    a = load_default_authoritative_annotations()
+    for s in a["scenarios"]:
+        if s["expected_behavior"] == "answer":
+            assert isinstance(s.get("measure"), str) and s["measure"].strip()
+            assert isinstance(s.get("evidence_description"), str) and s["evidence_description"].strip()
+
+
+def test_real_corpus_passes_measure_and_location_checks():
+    a = load_default_authoritative_annotations()
+    dev_path, heldout_path = default_corpus_paths()
+    dev = json.loads(dev_path.read_text())
+    heldout = json.loads(heldout_path.read_text())
+    assert check_corpus_against_annotations(dev, a) == []
+    assert check_corpus_against_annotations(heldout, a) == []
+
+
+def test_real_hold02_location_mismatch_is_refused():
+    # The acceptance case against the REAL artifacts: same measure name, wrong source location.
+    a = load_default_authoritative_annotations()
+    dev_path, heldout_path = default_corpus_paths()
+    dev = json.loads(dev_path.read_text())
+    heldout = json.loads(heldout_path.read_text())
+    for s in heldout["scenarios"]:
+        if s["id"] == "HOLD-02":
+            s["expectations"]["evidence_description"] = (
+                "Consolidated Statements of Operations; Total net sales row, 2026 column")
+    with pytest.raises(CorpusConsistencyError):
+        assert_corpora_consistent_with_annotations([dev, heldout], a)
+
+
+def test_real_dev_manifest_exists_and_matches_corpus():
+    dev_manifest_path, heldout_manifest_path = default_manifest_paths()
+    assert dev_manifest_path.exists(), f"DEV manifest missing: {dev_manifest_path}"
+    assert heldout_manifest_path.exists()
+    assert_default_manifests_valid()  # does not raise
+
+
+def test_real_dev_manifest_pins_canonical_hash():
+    dev_manifest_path, _ = default_manifest_paths()
+    manifest = json.loads(dev_manifest_path.read_text())
+    dev_path, _ = default_corpus_paths()
+    dev = json.loads(dev_path.read_text())
+    assert manifest["fixture_sha256"] == canonical_sha256(dev)
+    assert manifest["path"] == "data/model_gate/g2_corpus.dev.json"
+    assert default_manifest_paths()[0].name == DEFAULT_DEV_MANIFEST_PATH.name
+
+
+def test_dev_and_heldout_manifests_are_independently_verifiable():
+    dev_manifest_path, heldout_manifest_path = default_manifest_paths()
+    dev_manifest = json.loads(dev_manifest_path.read_text())
+    heldout_manifest = json.loads(heldout_manifest_path.read_text())
+    # Distinct pins; each names its own corpus path.
+    assert dev_manifest["fixture_sha256"] != heldout_manifest["heldout_fixture_sha256"]
+    assert dev_manifest["path"] != heldout_manifest["path"]
+
+
+def test_tampered_dev_corpus_fails_manifest_check():
+    dev_path, heldout_path = default_corpus_paths()
+    dev = json.loads(dev_path.read_text())
+    heldout = json.loads(heldout_path.read_text())
+    dev["scenarios"][0]["expectations"]["reference_value"] = 999999
+    with pytest.raises(CorpusConsistencyError):
+        assert_default_manifests_valid([dev, heldout])
+
+
+def test_default_corpora_consistent_also_verifies_dev_manifest(monkeypatch):
+    monkeypatch.setattr("apex_investor.corpus_consistency.default_manifest_paths",
+                        lambda: (Path("/nonexistent/dev.json"), Path("/nonexistent/held.json")))
+    with pytest.raises(CorpusConsistencyError):
+        assert_default_corpora_consistent()
+
+
+def test_verify_corpus_manifest_flags_hash_mismatch():
+    c = corpus([scen("A", False, 100)])
+    problems = verify_corpus_manifest(c, {"path": "x", "fixture_sha256": "0" * 64}, label="dev")
+    assert any("dev" in p and "canonical hash" in p for p in problems)
+
+
+def test_verify_corpus_manifest_accepts_matching_hash():
+    c = corpus([scen("A", False, 100)])
+    manifest = {"path": "x", "fixture_sha256": canonical_sha256(c)}
+    assert verify_corpus_manifest(c, manifest, label="dev") == []
 
 
 # ---- operator-approval record: pin + bind + scope (fail closed) -----------------------------------
