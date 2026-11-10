@@ -39,7 +39,10 @@ from apex_investor.corpus_consistency import (
 )
 from apex_investor.model_gate import canonical_sha256
 
-EXPECTED_SCENARIO_IDS = {"DEV-01", "DEV-02", "DEV-03", "HOLD-01", "HOLD-02", "HOLD-03"}
+EXPECTED_SCENARIO_IDS = {
+    "DEV-01", "DEV-02", "DEV-03", "HOLD-01", "HOLD-02", "HOLD-03",
+    "INJ-D1", "INJ-D2", "INJ-H1", "INJ-H2", "INJ-H3", "INJ-H4", "INJ-H5",
+}
 
 
 # ---- in-memory fixtures (pure logic) --------------------------------------------------------------
@@ -282,13 +285,13 @@ def test_annotation_without_scenarios_list_fails_closed(tmp_path):
 
 # ---- real, source-controlled artifacts (reproducible from a clean checkout) -----------------------
 
-def test_default_authority_loads_and_covers_all_six_scenarios():
+def test_default_authority_loads_and_covers_all_thirteen_scenarios():
     a = load_default_authoritative_annotations()
     ids = {s["scenario_id"] for s in a["scenarios"]}
     assert ids == EXPECTED_SCENARIO_IDS
 
 
-def test_real_corpora_cover_all_six_scenarios():
+def test_real_corpora_cover_all_thirteen_scenarios():
     dev_path, heldout_path = default_corpus_paths()
     dev = json.loads(dev_path.read_text())
     heldout = json.loads(heldout_path.read_text())

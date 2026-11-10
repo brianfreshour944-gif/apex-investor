@@ -79,10 +79,11 @@ G2_SCENARIO_MARKER = "question"
 
 # Raw-file SHA-256 of the source-controlled authority. Pinning the raw bytes (not a canonical
 # re-serialization) means any byte change to the authority is detected.
-# g2-pilot-draft-3 (2026-11-09): operator-approved revision adding `evidence_description` to every
-# scenario and correcting HOLD-02's source description under adjudication A. Supersedes 0bc0257b….
+# g2-pilot-draft-4 (2026-11-09, G2-C2d): operator-approved revision adding seven synthetic
+# prompt-injection scenarios (INJ-D1, INJ-D2, INJ-H1..INJ-H5) with `attack`/`injection_doc_sym`
+# metadata and their synthetic documents[]. Supersedes 3495633a….
 AUTHORITATIVE_ANNOTATIONS_SHA256 = (
-    "3495633a12497a583517e39f06d4df7df6b6ed71d5a1ccfbaf2c8e0157f25016"
+    "27f7569b30613132b9493cc7254cdf800f0d4ef2db2f8ecdd144f13d040c9e1b"
 )
 
 # The separate, source-controlled OPERATOR-APPROVAL record. Option (b): the authority stays a
@@ -94,13 +95,35 @@ DEFAULT_APPROVAL_PATH = Path("data/model_gate/g2_annotation_approval.json")
 # Raw-file SHA-256 of the approval record. Pinned so the approval's own bytes are frozen too: a change
 # to the approval record (or its disappearance) is detected.
 APPROVAL_RECORD_SHA256 = (
-    "808f551febc25d1c16d63a34ecf9b81533a737a82c80dbbb4e7d35b5ce6999e3"
+    "dd9c124a9914b1cb9ea66c16223486e742bda258f7eafa0d7e77b60c516364f9"
 )
 
-# The approval scope must cover every reference scenario, including the HOLD-03 abstention.
+# The approval scope must cover every reference scenario, including the HOLD-03 and INJ-H5 abstentions.
 REQUIRED_SCOPE_SCENARIO_IDS = frozenset(
-    {"DEV-01", "DEV-02", "DEV-03", "HOLD-01", "HOLD-02", "HOLD-03"}
+    {"DEV-01", "DEV-02", "DEV-03", "HOLD-01", "HOLD-02", "HOLD-03",
+     "INJ-D1", "INJ-D2", "INJ-H1", "INJ-H2", "INJ-H3", "INJ-H4", "INJ-H5"}
 )
+
+# The approved G2-C2d injection-scenario allocation (see the G2-C2d design report, rev 3). The gate
+# enforces this split so a dropped, duplicated, or mis-placed injection scenario fails closed. Keys are
+# the six approved attack classes (I-1..I-6). I-1 is the ONLY class in BOTH splits (with different
+# construction/wording) — the anti-memorization anchor.
+APPROVED_DEV_INJECTION_SCENARIOS = frozenset({"INJ-D1", "INJ-D2"})
+APPROVED_HELDOUT_INJECTION_SCENARIOS = frozenset(
+    {"INJ-H1", "INJ-H2", "INJ-H3", "INJ-H4", "INJ-H5"}
+)
+# Per-split class coverage (matches the approved allocation exactly):
+#   DEV     = {I-1 (answerable), I-3 (forged-value)}
+#   heldout = {I-1 (answerable, fresh construction), I-2, I-4, I-5, I-6}
+# The union must cover all six classes I-1..I-6, and I-1 must appear in both splits.
+APPROVED_DEV_INJECTION_CLASSES = frozenset({"I-1", "I-3"})
+APPROVED_HELDOUT_INJECTION_CLASSES = frozenset({"I-1", "I-2", "I-4", "I-5", "I-6"})
+ALL_INJECTION_CLASSES = frozenset({"I-1", "I-2", "I-3", "I-4", "I-5", "I-6"})
+# Fields required (non-empty) in an `attack` block. `target_assertion` may be empty (M5); an empty
+# `required_cited_doc_ids` list is valid (it means "no required citations").
+REQUIRED_ATTACK_FIELDS = ("goal", "target_action", "injection_doc_sym")
+# The marker key naming the supplied document that carries the hostile text.
+INJECTION_DOC_SYM_KEY = "injection_doc_sym"
 
 
 class CorpusConsistencyError(Exception):
@@ -388,6 +411,246 @@ def _location_clause(evidence_description: object) -> str:
     return evidence_description.split(".", 1)[0].strip()
 
 
+def _supplied_doc_ids(scenario: dict) -> set[str]:
+    """The set of `doc_id`s the scenario supplies, computed the same way `materialize_corpus` does.
+
+    A document's `doc_id` is `make_doc_id(source_url, sha256(raw))` (see `docstore`), independent of
+    any sanitized text. Computing it here lets the gate verify that an attack's `required_cited_doc_ids`
+    and `injection_doc_sym` actually resolve to documents the scenario supplies, without a store.
+    """
+    from .docstore import make_doc_id
+
+    out: set[str] = set()
+    for d in scenario.get("documents", []) or []:
+        if not isinstance(d, dict):
+            continue
+        url = d.get("source_url")
+        raw = d.get("raw")
+        if isinstance(url, str) and isinstance(raw, str):
+            out.add(make_doc_id(url, hashlib.sha256(raw.encode("utf-8")).hexdigest()))
+    return out
+
+
+def _supplied_doc_syms(scenario: dict) -> set[str]:
+    return {d.get("sym") for d in (scenario.get("documents", []) or [])
+            if isinstance(d, dict) and isinstance(d.get("sym"), str)}
+
+
+def _authority_injection_syms(annotations: dict) -> set[str]:
+    """Every `injection_doc_sym` named by the authority, across all annotation entries."""
+    out: set[str] = set()
+    for entry in annotations.get("scenarios", []) or []:
+        attack = entry.get("attack") if isinstance(entry, dict) else None
+        if isinstance(attack, dict):
+            sym = attack.get(INJECTION_DOC_SYM_KEY)
+            if isinstance(sym, str) and sym:
+                out.add(sym)
+    return out
+
+
+def _attack_shape_problems(sid: str, attack: object) -> list[str]:
+    """G3/G6: an `attack` block must be a non-empty object with the required non-empty fields.
+
+    `target_assertion` MAY be empty (M5) and `required_cited_doc_ids` MAY be an empty list; neither is
+    malformed. A missing/wrong-typed required field, a non-object attack, or an empty attack fails
+    closed.
+    """
+    problems: list[str] = []
+    if not isinstance(attack, dict):
+        return [f"{sid}: attack must be a JSON object (got {type(attack).__name__})"]
+    if not attack:
+        return [f"{sid}: attack is empty (fail closed)"]
+    for field in REQUIRED_ATTACK_FIELDS:
+        value = attack.get(field)
+        if not isinstance(value, str) or not value.strip():
+            problems.append(f"{sid}: attack.{field} must be a non-empty string (fail closed)")
+    if "target_assertion" in attack and not isinstance(attack["target_assertion"], str):
+        problems.append(f"{sid}: attack.target_assertion must be a string (may be empty)")
+    rids = attack.get("required_cited_doc_ids")
+    if not isinstance(rids, list) or any(not isinstance(r, str) for r in rids):
+        problems.append(
+            f"{sid}: attack.required_cited_doc_ids must be a list of strings (may be empty)")
+    return problems
+
+
+def check_injection_metadata(corpus: dict, annotations: dict) -> list[str]:
+    """G1–G7: fail-closed checks on per-scenario injection metadata. Returns sorted problems.
+
+    G1: a scenario that SUPPLIES a document named by any authority `injection_doc_sym` must declare a
+        valid, non-empty `attack`.
+    G2: `attack.injection_doc_sym` must resolve to a document the scenario actually supplies.
+    G3: the required `attack` fields are present and non-empty (see `_attack_shape_problems`).
+    G4: every `attack.required_cited_doc_ids` entry must resolve to a supplied document.
+    G5: a scenario that supplies NO injection document acquires NO injection requirement (no false
+        positives); an absent attack there is fine.
+    G6: a malformed/incomplete `attack` fails closed (even when one is present without an injection
+        document).
+    G7: the corpus `attack` must equal the authority `attack` field-for-field.
+    """
+    if not isinstance(corpus, dict) or not isinstance(corpus.get("scenarios"), list):
+        return ["corpus must be an object with a 'scenarios' list"]
+    ann = _annotation_index(annotations)
+    injection_syms = _authority_injection_syms(annotations)
+    problems: list[str] = []
+    for scenario in corpus["scenarios"]:
+        sid = scenario.get("id")
+        if not isinstance(sid, str):
+            continue
+        expectations = scenario.get("expectations")
+        if not isinstance(expectations, dict):
+            continue
+        corpus_attack = expectations.get("attack")
+        supplies_injection = bool(_supplied_doc_syms(scenario) & injection_syms)
+
+        if supplies_injection and (not isinstance(corpus_attack, dict) or not corpus_attack):
+            problems.append(
+                f"{sid}: scenario supplies an injection document but declares no non-empty attack "
+                "(D-1 / G1: fail closed)")
+        if corpus_attack is None:
+            continue  # G5: nothing else to check for a scenario with no attack
+
+        problems.extend(_attack_shape_problems(sid, corpus_attack))
+        if not isinstance(corpus_attack, dict):
+            continue
+
+        supplied_ids = _supplied_doc_ids(scenario)
+        supplied_syms = _supplied_doc_syms(scenario)
+
+        # G2: the injection document must be one the scenario supplies.
+        marker = corpus_attack.get(INJECTION_DOC_SYM_KEY)
+        if isinstance(marker, str) and marker and marker not in supplied_syms:
+            problems.append(
+                f"{sid}: attack.{INJECTION_DOC_SYM_KEY}={marker!r} is not among the scenario's "
+                "supplied documents (G2: fail closed)")
+
+        # G4: every required cited doc id must resolve to a supplied document.
+        rids = corpus_attack.get("required_cited_doc_ids")
+        if isinstance(rids, list):
+            unresolved = sorted(r for r in rids if isinstance(r, str) and r not in supplied_ids)
+            if unresolved:
+                problems.append(
+                    f"{sid}: attack.required_cited_doc_ids entries do not resolve to supplied "
+                    f"documents: {unresolved} (G4: fail closed)")
+
+        # G7: the corpus attack must equal the authority's attack (field-for-field).
+        entry = ann.get(sid)
+        authority_attack = entry.get("attack") if isinstance(entry, dict) else None
+        if isinstance(authority_attack, dict):
+            if corpus_attack != authority_attack:
+                problems.append(
+                    f"{sid}: corpus attack does not equal the authority attack (G7: fail closed)")
+    return sorted(problems)
+
+
+def check_split_integrity(corpora: list[dict], annotations: dict) -> list[str]:
+    """G8: verify the approved seven-scenario injection allocation across the corpus set.
+
+    Requires: the DEV split contains exactly the approved DEV injection scenarios; the held-out split
+    contains exactly the approved held-out injection scenarios; class I-1 is present in BOTH splits;
+    and the held-out split covers each of I-2..I-6. A missing, extra, or misplaced injection scenario
+    (a coverage hole, or a class tested only in DEV) fails closed. A scenario's class comes from its
+    authority entry's `attack_class`.
+    """
+    if not isinstance(corpora, list) or not corpora:
+        return ["split-integrity check needs at least one corpus"]
+    # G8 verifies the approved INJECTION allocation. When the authority declares no injection
+    # documents (legacy/synthetic corpora), there is no allocation to verify and the check is a no-op;
+    # dropping an injection scenario from a genuine G2 corpus is separately caught by the
+    # full-coverage check (every annotation must have a matching corpus scenario).
+    if not _authority_injection_syms(annotations):
+        return []
+    ann = _annotation_index(annotations)
+    # Map scenario id -> corpus label, using each corpus's own `corpus` field.
+    by_label: dict[str, set[str]] = {}
+    question_by_id: dict[str, str] = {}
+    for corpus in corpora:
+        label = corpus.get("corpus") if isinstance(corpus, dict) else None
+        ids = {s.get("id") for s in corpus.get("scenarios", []) if isinstance(s, dict)}
+        if isinstance(label, str):
+            by_label[label] = ids
+        for s in corpus.get("scenarios", []):
+            if isinstance(s, dict) and isinstance(s.get("id"), str):
+                q = s.get("question")
+                if isinstance(q, str):
+                    question_by_id[s["id"]] = q
+
+    def _corpus_question(sid: str) -> str | None:
+        return question_by_id.get(sid)
+
+    problems: list[str] = []
+
+    def _class_of(sid: str) -> str | None:
+        entry = ann.get(sid)
+        if isinstance(entry, dict):
+            cls = entry.get("attack_class")
+            return cls if isinstance(cls, str) else None
+        return None
+
+    dev_ids = by_label.get("dev", set())
+    hold_ids = by_label.get("heldout", set())
+    dev_inj = {s for s in dev_ids if s in APPROVED_DEV_INJECTION_SCENARIOS or s.startswith("INJ-")}
+    hold_inj = {s for s in hold_ids if s in APPROVED_HELDOUT_INJECTION_SCENARIOS or s.startswith("INJ-")}
+
+    if dev_inj != set(APPROVED_DEV_INJECTION_SCENARIOS):
+        problems.append(
+            f"G8: DEV injection scenarios {sorted(dev_inj)} != approved "
+            f"{sorted(APPROVED_DEV_INJECTION_SCENARIOS)}")
+    if hold_inj != set(APPROVED_HELDOUT_INJECTION_SCENARIOS):
+        problems.append(
+            f"G8: held-out injection scenarios {sorted(hold_inj)} != approved "
+            f"{sorted(APPROVED_HELDOUT_INJECTION_SCENARIOS)}")
+
+    dev_classes = {_class_of(s) for s in dev_inj}
+    hold_classes = {_class_of(s) for s in hold_inj}
+    if dev_classes != set(APPROVED_DEV_INJECTION_CLASSES):
+        problems.append(
+            f"G8: DEV injection classes {sorted(c for c in dev_classes if c)} != approved "
+            f"{sorted(APPROVED_DEV_INJECTION_CLASSES)}")
+    if hold_classes != set(APPROVED_HELDOUT_INJECTION_CLASSES):
+        problems.append(
+            f"G8: held-out injection classes {sorted(c for c in hold_classes if c)} != approved "
+            f"{sorted(APPROVED_HELDOUT_INJECTION_CLASSES)}")
+    if "I-1" not in dev_classes:
+        problems.append("G8: class I-1 must be present in the DEV split (anti-memorization anchor)")
+    if "I-1" not in hold_classes:
+        problems.append("G8: class I-1 must be present in the held-out split (fresh construction)")
+    union = {c for c in (dev_classes | hold_classes) if c}
+    missing = sorted(ALL_INJECTION_CLASSES - union)
+    if missing:
+        problems.append(f"G8: injection classes missing from the corpus set: {missing}")
+
+    # I-1 anti-memorization: the DEV and held-out I-1 scenarios must not reuse attack wording OR
+    # construction. A held-out I-1 that merely echoes the DEV one is a memorization twin, not a fresh
+    # test. Checked on the AUTHORITY metadata (attack_construction, attack phrases, question).
+    def _i1_of(ids: set[str]) -> str | None:
+        for sid in sorted(ids):
+            if _class_of(sid) == "I-1":
+                return sid
+        return None
+
+    dev_i1 = _i1_of(dev_inj)
+    hold_i1 = _i1_of(hold_inj)
+    if dev_i1 and hold_i1:
+        de = ann.get(dev_i1) or {}
+        he = ann.get(hold_i1) or {}
+        if de.get("attack_construction") == he.get("attack_construction"):
+            problems.append(
+                f"G8: I-1 construction reused across splits "
+                f"({dev_i1}/{hold_i1} both {de.get('attack_construction')!r})")
+        da = de.get("attack") or {}
+        ha = he.get("attack") or {}
+        for field in ("target_action", "target_assertion"):
+            dv, hv = da.get(field), ha.get(field)
+            if dv and hv and dv == hv:
+                problems.append(
+                    f"G8: I-1 attack.{field} reused across splits ({dev_i1}/{hold_i1}: {dv!r})")
+        dq = (_corpus_question(dev_i1) or "").strip()
+        hq = (_corpus_question(hold_i1) or "").strip()
+        if dq and dq == hq:
+            problems.append(f"G8: I-1 question text reused across splits ({dev_i1}/{hold_i1})")
+    return sorted(problems)
+
+
 def check_corpus_against_annotations(corpus: dict, annotations: dict, *,
                                      require_full_coverage: bool = False) -> list[str]:
     """Return a sorted list of consistency problems (empty means consistent).
@@ -480,6 +743,7 @@ def check_corpus_against_annotations(corpus: dict, annotations: dict, *,
         for sid in ann:
             if sid not in seen:
                 problems.append(f"{sid}: annotation has no matching corpus scenario")
+    problems.extend(check_injection_metadata(corpus, annotations))
     return sorted(problems)
 
 
@@ -508,6 +772,7 @@ def assert_corpora_consistent_with_annotations(corpora: list[dict], annotations:
     for sid in _annotation_index(annotations):
         if sid not in seen:
             problems.append(f"{sid}: annotation has no matching corpus scenario")
+    problems.extend(check_split_integrity(corpora, annotations))
     if problems:
         raise CorpusConsistencyError(
             "corpus/annotation consistency check failed:\n  " + "\n  ".join(sorted(problems)))

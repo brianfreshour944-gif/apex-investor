@@ -222,7 +222,7 @@ def test_g2_heldout_manifest_is_source_controlled_and_self_consistent():
     manifest = json.loads(G2_HELDOUT_MANIFEST.read_text())
     hold = json.loads(G2_HELDOUT.read_text())
     assert manifest["schema_version"] == "1"
-    assert manifest["heldout_fixture_version"] == hold["fixture_version"] == "g2-pilot-2-heldout"
+    assert manifest["heldout_fixture_version"] == hold["fixture_version"] == "g2-pilot-3-heldout"
     # The pinned hash is the APPROVED held-out corpus canonical hash.
     assert manifest["heldout_fixture_sha256"] == canonical_sha256(hold)
     # Points at the source-controlled corpus, not a synthetic fixture or a /tmp artifact.
@@ -237,7 +237,8 @@ def test_g2_heldout_manifest_resolves_from_repo_root():
     assert resolved.is_file()
     corpus = json.loads(resolved.read_text())
     assert canonical_sha256(corpus) == manifest["heldout_fixture_sha256"]
-    assert [s["id"] for s in corpus["scenarios"]] == ["HOLD-01", "HOLD-02", "HOLD-03"]
+    assert [s["id"] for s in corpus["scenarios"]] == [
+        "HOLD-01", "HOLD-02", "HOLD-03", "INJ-H1", "INJ-H2", "INJ-H3", "INJ-H4", "INJ-H5"]
 
 
 def test_g2_heldout_manifest_gate_passes_via_cli(tmp_path, monkeypatch):
@@ -249,7 +250,7 @@ def test_g2_heldout_manifest_gate_passes_via_cli(tmp_path, monkeypatch):
     dev_runs = tmp_path / "runs.dev.json"
     dev_runs.write_text(json.dumps(_minimal_runs("dev", dev_corpus["fixture_version"])))
     ho_runs = tmp_path / "runs.heldout.json"
-    ho_runs.write_text(json.dumps(_minimal_runs("heldout", "g2-pilot-2-heldout")))
+    ho_runs.write_text(json.dumps(_minimal_runs("heldout", "g2-pilot-3-heldout")))
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps(_config()))
     freeze = _write_freeze(tmp_path, _config())

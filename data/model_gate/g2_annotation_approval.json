@@ -1,33 +1,40 @@
 {
  "record_type": "g2-annotation-approval",
- "record_version": "2",
+ "record_version": "3",
  "created_at": "2026-11-09",
  "approved_by": "operator",
  "approved_by_role": "operator (explicit written authorization)",
  "approved_at": "2026-11-09",
- "method": "operator-approved revision; additive source-location field (evidence_description) on all six scenarios plus the HOLD-02 source-description correction under adjudication A; reference values and documents[] capture pins unchanged",
+ "method": "operator-approved revision for G2-C2d: adds seven synthetic prompt-injection scenarios (INJ-D1, INJ-D2, INJ-H1..INJ-H5) with `attack`/`injection_doc_sym` metadata and their synthetic documents[]. Existing reference values and capture pins unchanged.",
  "authoritative_source": "data/model_gate/g2_annotations.json",
- "approved_authority_raw_sha256": "3495633a12497a583517e39f06d4df7df6b6ed71d5a1ccfbaf2c8e0157f25016",
- "source_frozen_sha256": "3495633a12497a583517e39f06d4df7df6b6ed71d5a1ccfbaf2c8e0157f25016",
+ "approved_authority_raw_sha256": "27f7569b30613132b9493cc7254cdf800f0d4ef2db2f8ecdd144f13d040c9e1b",
+ "source_frozen_sha256": "27f7569b30613132b9493cc7254cdf800f0d4ef2db2f8ecdd144f13d040c9e1b",
  "supersedes": {
-  "approved_authority_raw_sha256": "0bc0257b90ad2431ad34db2fdd12d697973e62db619363d9a0aad6f80b224c99",
+  "approved_authority_raw_sha256": "3495633a12497a583517e39f06d4df7df6b6ed71d5a1ccfbaf2c8e0157f25016",
   "approved_at": "2026-11-09",
-  "note": "original G2 pilot approval (annotation_version g2-pilot-draft-2)"
+  "note": "G2-C2c approval (annotation_version g2-pilot-draft-3)"
  },
  "scope": {
-  "description": "all six reference annotations, including the HOLD-03 abstention",
+  "description": "all thirteen reference annotations, including the HOLD-03 and INJ-H5 abstentions",
   "scenario_ids": [
    "DEV-01",
    "DEV-02",
    "DEV-03",
    "HOLD-01",
    "HOLD-02",
-   "HOLD-03"
+   "HOLD-03",
+   "INJ-D1",
+   "INJ-D2",
+   "INJ-H1",
+   "INJ-H2",
+   "INJ-H3",
+   "INJ-H4",
+   "INJ-H5"
   ],
   "includes_abstention": true
  },
  "provenance": {
-  "note": "Revised approval bound to the current authority by raw SHA-256. The operator authorized the authority-file change and this new approval event in-session (G2-C2c). Reference values are NOT duplicated here: data/model_gate/g2_annotations.json remains the single source of truth. The AAPL-FY2026 original capture hash (f4609015\u2026) is preserved unchanged and remains an open provenance exception (finding F-7).",
-  "superseded_authority_sha256": "0bc0257b90ad2431ad34db2fdd12d697973e62db619363d9a0aad6f80b224c99"
+  "note": "Revised approval bound to the current authority by raw SHA-256. The operator authorized the authority-file change and this new approval event in-session (G2-C2d). Reference values are NOT duplicated here: data/model_gate/g2_annotations.json remains the single source of truth. The AAPL-FY2026 original capture hash (f4609015...) is preserved unchanged and remains an open provenance exception (finding F-7).",
+  "superseded_authority_sha256": "3495633a12497a583517e39f06d4df7df6b6ed71d5a1ccfbaf2c8e0157f25016"
  }
 }
