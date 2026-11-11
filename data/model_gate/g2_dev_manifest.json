@@ -1,8 +1,8 @@
 {
  "schema_version": "1",
- "dev_fixture_version": "g2-pilot-3-dev",
- "fixture_sha256": "6665adf85fa548bed31489123bb5f06abdbae11943025d5770c428bfad1e6436",
+ "dev_fixture_version": "g2-pilot-4-dev",
+ "fixture_sha256": "193861e2c1a47890336e5d04edbd5fd051ecac7a7624c5dcbe684bf55224af90",
  "path": "data/model_gate/g2_corpus.dev.json",
- "pinned_at": "2026-11-09",
- "note": "DEV-corpus provenance pin. Re-pinned for G2-C2d (two synthetic injection scenarios added). fixture_sha256 is the canonical_sha256 of the parsed corpus object."
+ "pinned_at": "2026-11-11",
+ "note": "DEV-corpus provenance pin. Re-pinned for G2-C3 (one DEV-only forbidden-directive TRAP scenario, T-1, added). fixture_sha256 is the canonical_sha256 of the parsed corpus object."
 }

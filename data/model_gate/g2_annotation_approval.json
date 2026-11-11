@@ -1,25 +1,26 @@
 {
  "record_type": "g2-annotation-approval",
- "record_version": "3",
- "created_at": "2026-11-09",
+ "record_version": "4",
+ "created_at": "2026-11-11",
  "approved_by": "operator",
  "approved_by_role": "operator (explicit written authorization)",
- "approved_at": "2026-11-09",
- "method": "operator-approved revision for G2-C2d: adds seven synthetic prompt-injection scenarios (INJ-D1, INJ-D2, INJ-H1..INJ-H5) with `attack`/`injection_doc_sym` metadata and their synthetic documents[]. Existing reference values and capture pins unchanged.",
+ "approved_at": "2026-11-11",
+ "method": "Explicit operator authorization received by the OpenHands implementer on 2026-11-11: implement the single DEV-only G2-C3 T-1 forbidden-directive TRAP scenario using NVIDIA FY2026 Form 10-K, accession 0001045810-26-000021, including the required DEV corpus, annotation, manifest, approval, and test updates. No HELDOUT, scorer, threshold, prompt, model-evaluation, or freeze changes.",
  "authoritative_source": "data/model_gate/g2_annotations.json",
- "approved_authority_raw_sha256": "27f7569b30613132b9493cc7254cdf800f0d4ef2db2f8ecdd144f13d040c9e1b",
- "source_frozen_sha256": "27f7569b30613132b9493cc7254cdf800f0d4ef2db2f8ecdd144f13d040c9e1b",
+ "approved_authority_raw_sha256": "991f38c07dec8dbbb3369bd9c5c21d643299f0753740b35279958e7b63425a18",
+ "source_frozen_sha256": "991f38c07dec8dbbb3369bd9c5c21d643299f0753740b35279958e7b63425a18",
  "supersedes": {
-  "approved_authority_raw_sha256": "3495633a12497a583517e39f06d4df7df6b6ed71d5a1ccfbaf2c8e0157f25016",
+  "approved_authority_raw_sha256": "27f7569b30613132b9493cc7254cdf800f0d4ef2db2f8ecdd144f13d040c9e1b",
   "approved_at": "2026-11-09",
-  "note": "G2-C2c approval (annotation_version g2-pilot-draft-3)"
+  "note": "G2-C2d approval (annotation_version g2-pilot-draft-4)"
  },
  "scope": {
-  "description": "all thirteen reference annotations, including the HOLD-03 and INJ-H5 abstentions",
+  "description": "all fourteen reference annotations, including the HOLD-03 and INJ-H5 abstentions",
   "scenario_ids": [
    "DEV-01",
    "DEV-02",
    "DEV-03",
+   "T-1",
    "HOLD-01",
    "HOLD-02",
    "HOLD-03",
@@ -34,7 +35,7 @@
   "includes_abstention": true
  },
  "provenance": {
-  "note": "Revised approval bound to the current authority by raw SHA-256. The operator authorized the authority-file change and this new approval event in-session (G2-C2d). Reference values are NOT duplicated here: data/model_gate/g2_annotations.json remains the single source of truth. The AAPL-FY2026 original capture hash (f4609015...) is preserved unchanged and remains an open provenance exception (finding F-7).",
-  "superseded_authority_sha256": "3495633a12497a583517e39f06d4df7df6b6ed71d5a1ccfbaf2c8e0157f25016"
+  "note": "Revised approval bound to the current authority by raw SHA-256. The operator authorized the authority-file change and this new approval event (G2-C3). Reference values are NOT duplicated here: data/model_gate/g2_annotations.json remains the single source of truth. The AAPL-FY2026 original capture hash (f4609015...) is preserved unchanged and remains an open provenance exception (finding F-7).",
+  "superseded_authority_sha256": "27f7569b30613132b9493cc7254cdf800f0d4ef2db2f8ecdd144f13d040c9e1b"
  }
 }

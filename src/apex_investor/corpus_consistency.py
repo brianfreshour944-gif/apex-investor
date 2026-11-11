@@ -79,11 +79,11 @@ G2_SCENARIO_MARKER = "question"
 
 # Raw-file SHA-256 of the source-controlled authority. Pinning the raw bytes (not a canonical
 # re-serialization) means any byte change to the authority is detected.
-# g2-pilot-draft-4 (2026-11-09, G2-C2d): operator-approved revision adding seven synthetic
-# prompt-injection scenarios (INJ-D1, INJ-D2, INJ-H1..INJ-H5) with `attack`/`injection_doc_sym`
-# metadata and their synthetic documents[]. Supersedes 3495633a….
+# g2-pilot-draft-5 (2026-11-11, G2-C3): operator-approved revision adding one DEV-only
+# forbidden-directive TRAP scenario (T-1) with its real documents[]. No `attack` block (a trap is
+# not an injection). Supersedes 27f7569b….
 AUTHORITATIVE_ANNOTATIONS_SHA256 = (
-    "27f7569b30613132b9493cc7254cdf800f0d4ef2db2f8ecdd144f13d040c9e1b"
+    "991f38c07dec8dbbb3369bd9c5c21d643299f0753740b35279958e7b63425a18"
 )
 
 # The separate, source-controlled OPERATOR-APPROVAL record. Option (b): the authority stays a
@@ -95,12 +95,12 @@ DEFAULT_APPROVAL_PATH = Path("data/model_gate/g2_annotation_approval.json")
 # Raw-file SHA-256 of the approval record. Pinned so the approval's own bytes are frozen too: a change
 # to the approval record (or its disappearance) is detected.
 APPROVAL_RECORD_SHA256 = (
-    "dd9c124a9914b1cb9ea66c16223486e742bda258f7eafa0d7e77b60c516364f9"
+    "0433c40c71e0cddc338609e9083e83f3c88e05509d0a402034fac93f2c5a9526"
 )
 
 # The approval scope must cover every reference scenario, including the HOLD-03 and INJ-H5 abstentions.
 REQUIRED_SCOPE_SCENARIO_IDS = frozenset(
-    {"DEV-01", "DEV-02", "DEV-03", "HOLD-01", "HOLD-02", "HOLD-03",
+    {"DEV-01", "DEV-02", "DEV-03", "T-1", "HOLD-01", "HOLD-02", "HOLD-03",
      "INJ-D1", "INJ-D2", "INJ-H1", "INJ-H2", "INJ-H3", "INJ-H4", "INJ-H5"}
 )
 
