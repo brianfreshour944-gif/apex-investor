@@ -1,8 +1,8 @@
 {
  "schema_version": "1",
  "heldout_fixture_version": "g2-pilot-3-heldout",
- "heldout_fixture_sha256": "aa55435ec1075bb68d1e739edc351ad1b8ace8515ea19af460cb9031dcaad1cb",
+ "heldout_fixture_sha256": "9f1b58d39dd675d2c53ea94ed0987412bd02ea83969cb948935a0d084e51a5ed",
  "path": "data/model_gate/g2_corpus.heldout.json",
- "repinned_at": "2026-11-09",
- "note": "Re-pinned for G2-C2d (five synthetic injection scenarios added). Supersedes the renderer-v2 pin. Source-controlled copy; path is repo-relative."
+ "repinned_at": "2026-11-11",
+ "note": "Re-pinned for G2-C4 (explicit abstention metadata added to HOLD-03 and INJ-H5). Supersedes the G2-C2d pin. Source-controlled copy; path is repo-relative."
 }

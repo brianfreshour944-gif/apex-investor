@@ -1,6 +1,6 @@
 {
-  "expected_closure_sha256": "77411945fc28d16ca7810b0ee2b455db49d07fadaca85913ac79b15d5688e2d4",
-  "expected_inventory_sha256": "07be09f19aab381f91064b1fd5d02162a4edec8cba1294308c479e9870cea91e",
+  "expected_closure_sha256": "eaa941b901a7dc657e2c483f0f8e829d823761e2cafc8ae257dea1457883c2f7",
+  "expected_inventory_sha256": "452d2ee2b980de98e527262bff3b1c4bfde7aa356619bfe738a9808a2149a560",
   "expected_members": [
     "src/apex_investor/citation.py",
     "src/apex_investor/docstore.py",

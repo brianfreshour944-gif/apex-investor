@@ -58,7 +58,16 @@ import json
 from pathlib import Path
 
 from .citation import _content_terms
-from .model_gate import canonical_sha256
+from .model_gate import (
+    _abstain_claim_is_purported,
+    _abstain_period_context,
+    _g2_requested_measure_terms,
+    _g2_requested_period_tokens,
+    _g2_requested_scope_terms,
+    _integer_values,
+    _normalized_contains,
+    canonical_sha256,
+)
 
 # The single, source-controlled authority: a byte-exact copy of the frozen operator annotations.
 DEFAULT_ANNOTATIONS_PATH = Path("data/model_gate/g2_annotations.json")
@@ -79,11 +88,11 @@ G2_SCENARIO_MARKER = "question"
 
 # Raw-file SHA-256 of the source-controlled authority. Pinning the raw bytes (not a canonical
 # re-serialization) means any byte change to the authority is detected.
-# g2-pilot-draft-5 (2026-11-11, G2-C3): operator-approved revision adding one DEV-only
-# forbidden-directive TRAP scenario (T-1) with its real documents[]. No `attack` block (a trap is
-# not an injection). Supersedes 27f7569b….
+# g2-pilot-draft-6 (2026-11-11, G2-C4): operator-approved revision adding explicit abstention
+# metadata (requested_measure_terms / requested_scope_terms / requested_period_tokens /
+# tempting_neighbor_spans) to HOLD-03 and INJ-H5 for the v2d abstention rule. Supersedes 991f38c0….
 AUTHORITATIVE_ANNOTATIONS_SHA256 = (
-    "991f38c07dec8dbbb3369bd9c5c21d643299f0753740b35279958e7b63425a18"
+    "57d53b3c715c1ac030628f425cedc0561046866079ba2f9e2e4453a4a5ebd46c"
 )
 
 # The separate, source-controlled OPERATOR-APPROVAL record. Option (b): the authority stays a
@@ -95,7 +104,7 @@ DEFAULT_APPROVAL_PATH = Path("data/model_gate/g2_annotation_approval.json")
 # Raw-file SHA-256 of the approval record. Pinned so the approval's own bytes are frozen too: a change
 # to the approval record (or its disappearance) is detected.
 APPROVAL_RECORD_SHA256 = (
-    "0433c40c71e0cddc338609e9083e83f3c88e05509d0a402034fac93f2c5a9526"
+    "cc354a5a6efdc1aad99c7ecbd64db06ba92fb123ab0ccfe6b4f14341475e6ac3"
 )
 
 # The approval scope must cover every reference scenario, including the HOLD-03 and INJ-H5 abstentions.
@@ -651,6 +660,127 @@ def check_split_integrity(corpora: list[dict], annotations: dict) -> list[str]:
     return sorted(problems)
 
 
+V2D_ABSTENTION_KEYS = ("requested_measure_terms", "requested_scope_terms",
+                       "requested_period_tokens", "tempting_neighbor_spans")
+
+
+def _declares_v2d_metadata(mapping: object) -> bool:
+    """True iff `mapping` declares ANY v2d abstention key (corpus or authority copy)."""
+    return isinstance(mapping, dict) and any(k in mapping for k in V2D_ABSTENTION_KEYS)
+
+
+def _is_attack_payload_span(expectations: dict, span: str) -> bool:
+    """True iff `span` is the scenario's adversarial payload.
+
+    The A2/A3 exemption is deliberately NARROW: a declared span is exempt only when it literally
+    contains the attack's `target_assertion` (or `target_action`). Any other declared span — in an
+    attack scenario or not — is treated as honest neighbour evidence and must pass A2/A3. A span that
+    merely coexists with an attack does not inherit the exemption.
+    """
+    attack = expectations.get("attack")
+    if not isinstance(attack, dict) or not attack:
+        return False
+    for key in ("target_assertion", "target_action"):
+        target = attack.get(key)
+        if isinstance(target, str) and target.strip() and _normalized_contains(span, target):
+            return True
+    return False
+
+
+def check_abstention_metadata(corpus: dict, annotations: dict) -> list[str]:
+    """Fail-closed checks on per-scenario abstention metadata. Returns sorted problems.
+
+    An abstention scenario is scored by the v2d rule, which needs explicit metadata to tell a
+    purported answer from contextual evidence. Every `must_abstain` scenario must therefore declare:
+      - a non-empty `requested_measure_terms` (otherwise the scenario is unscored by the rule);
+      - `tempting_neighbor_spans`: the verbatim excerpts the model is expected to encounter.
+    Each declared span must carry its period context (A1): a bare figure without a period-bearing
+    header is ambiguous and rejected. For a scenario WITHOUT an injection attack, the declared spans
+    are honest neighbour evidence, so (A2) no span may itself read as a purported answer and (A3) no
+    span may carry a value in the requested period for the requested measure — otherwise the request
+    and the neighbour are lexically indistinguishable and the scenario cannot discriminate. A span is
+    EXEMPT from A2/A3 only when it is the scenario's adversarial payload (it literally contains the
+    attack's `target_assertion`/`target_action`), because such a span is BY DESIGN a purported answer
+    and is validated by `check_injection_metadata`. A span that merely coexists with an attack does
+    NOT inherit the exemption; A1 still applies to the payload.
+
+    A scenario is treated as legacy (left to the `supported == 0` rule, not checked here) ONLY when
+    NEITHER the corpus copy NOR the authority copy declares any v2d abstention key. If either copy
+    declares any v2d key, the scenario is a v2d scenario: the complete required metadata must be
+    present in BOTH copies and exactly equal, so removing metadata from either copy (which would
+    silently revert the scenario to legacy scoring or slip past the two-copy check) is refused.
+    """
+    if not isinstance(corpus, dict) or not isinstance(corpus.get("scenarios"), list):
+        return ["corpus must be an object with a 'scenarios' list"]
+    ann = _annotation_index(annotations)
+    problems: list[str] = []
+    for scenario in corpus["scenarios"]:
+        expectations = scenario.get("expectations")
+        if not isinstance(expectations, dict) or not expectations.get("must_abstain"):
+            continue
+        sid = scenario.get("id")
+        entry = ann.get(sid) or {}
+        # v2d vs legacy is decided by BOTH copies: if either the corpus or the authority declares any
+        # v2d abstention key, the scenario is a v2d scenario and MUST carry the complete required
+        # metadata in BOTH copies, exactly equal. Only when NEITHER copy declares any v2d key is it a
+        # genuine legacy abstention left to the `supported == 0` rule. This is symmetric: removing the
+        # metadata from either copy is caught (fail closed), and a partial addition in either copy is
+        # caught.
+        if not (_declares_v2d_metadata(expectations) or _declares_v2d_metadata(entry)):
+            continue  # genuine legacy abstention: neither copy declares v2d metadata
+        for key in V2D_ABSTENTION_KEYS:
+            in_corpus, in_authority = key in expectations, key in entry
+            if not (in_corpus and in_authority):
+                missing = "corpus" if not in_corpus else "authority"
+                problems.append(
+                    f"{sid}: {key} is declared in one copy but missing from the {missing} copy "
+                    "(v2d metadata must be present in both; fail closed)")
+            elif entry[key] != expectations[key]:
+                problems.append(
+                    f"{sid}: corpus {key} disagrees with the authority annotation (fail closed)")
+        if not _declares_v2d_metadata(expectations):
+            # The corpus copy declares no v2d metadata (the authority copy does); the missing-copy
+            # problems above already fail the scenario closed. Nothing further to validate.
+            continue
+        measure = _g2_requested_measure_terms(expectations)
+        if not measure:
+            problems.append(
+                f"{sid}: abstention scenario declares requested_measure_terms but they yield no "
+                "content terms (A0: fail closed)")
+            continue
+        scope = _g2_requested_scope_terms(expectations)
+        period = _g2_requested_period_tokens(expectations)
+        spans = expectations.get("tempting_neighbor_spans")
+        if not isinstance(spans, list) or not spans:
+            problems.append(
+                f"{sid}: abstention scenario declares no tempting_neighbor_spans (A1: fail closed)")
+            continue
+        for index, span in enumerate(spans):
+            if not isinstance(span, str) or not span.strip():
+                problems.append(
+                    f"{sid}: tempting_neighbor_spans[{index}] is empty or not a string "
+                    "(A1: fail closed)")
+                continue
+            non_negated, all_tokens = _abstain_period_context(span)
+            if not all_tokens:
+                problems.append(
+                    f"{sid}: tempting_neighbor_spans[{index}] carries no period context "
+                    "(A1: a bare figure is ambiguous; fail closed)")
+                continue
+            if _is_attack_payload_span(expectations, span):
+                continue  # the adversarial payload is validated by check_injection_metadata
+            if _abstain_claim_is_purported(span, measure, scope, period):
+                problems.append(
+                    f"{sid}: tempting_neighbor_spans[{index}] reads as a purported answer to the "
+                    "requested measure (A2: scenario cannot discriminate; fail closed)")
+            if period and (non_negated & period) and _integer_values(span):
+                problems.append(
+                    f"{sid}: tempting_neighbor_spans[{index}] carries a value in the requested "
+                    "period for the requested measure (A3: request and neighbour are "
+                    "indistinguishable; fail closed)")
+    return sorted(problems)
+
+
 def check_corpus_against_annotations(corpus: dict, annotations: dict, *,
                                      require_full_coverage: bool = False) -> list[str]:
     """Return a sorted list of consistency problems (empty means consistent).
@@ -744,6 +874,7 @@ def check_corpus_against_annotations(corpus: dict, annotations: dict, *,
             if sid not in seen:
                 problems.append(f"{sid}: annotation has no matching corpus scenario")
     problems.extend(check_injection_metadata(corpus, annotations))
+    problems.extend(check_abstention_metadata(corpus, annotations))
     return sorted(problems)
 
 
